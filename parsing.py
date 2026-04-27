@@ -1,124 +1,217 @@
 from sys import argv
 from typing import Any
 
-class Parser():
+class Parser:
     @staticmethod
-    def line_parser(line: str, map: dict[str, Any], f: int) -> None:
+    def line_parser(raw_line: str, map: dict[str, Any], hub_names: set[str], f: bool) -> None:
         KEYS = {'start_hub', 'end_hub', 'hub', 'connection'}
-        if not line or line.startswith('#'):
-            return
-        if not ':' in line or line.count(':') != 1:
-            raise SystemExit("Error: Invalid line format")
+        line = raw_line
+        if line.count(':') != 1:
+            raise SystemExit(f"Error: Invalid line format '{raw_line}', there must be exactly one ':' in the line")
         key, value = line.split(':')
         key = key.strip()
         value = value.strip()
         if not key:
-            raise SystemExit("Error: Key cannot be empty")
+            raise SystemExit(f"Error: Key cannot be empty in line '{raw_line}'")
         if not value:
-            raise SystemExit("Error: Value cannot be empty")
+            raise SystemExit(f"Error: Value cannot be empty in line '{raw_line}'")
         if f:
-            if not key == 'nb_drones':
-                raise SystemExit("Error: First line must be nb_drones")
+            if key != 'nb_drones':
+                raise SystemExit(f"Error: First line must be nb_drones in line '{raw_line}'")
             try:
                 value = int(value)
+                if value <= 0:
+                    raise SystemExit(f"Error: nb_drones must be a positive integer in line '{raw_line}'")
             except ValueError:
-                raise SystemExit("Error: nb_drones must be an integer")
-            else:
-                if value < 0:
-                    raise SystemExit("Error: nb_drones must be a positive integer")
-                map['nb_drones'] = value
-                f = 0
+                raise SystemExit(f"Error: nb_drones must be an integer in line '{raw_line}'")
+            map['nb_drones'] = value
+            return
         if key not in KEYS:
-            raise SystemExit(f"Error: Invalid key '{key}'")
-        if key == 'nb_drones':
-            raise SystemExit("Error: nb_drones must be in the first line and cannot be repeated")
-        start_f = 0
-        end_f = 0
-        hub_names = {}
-        if key == 'start_hub' or key == 'end_hub' or key == 'hub':
-            if key == 'start_hub' and start_f:
-                raise SystemExit("Error: start_hub cannot be repeated")
-            if key == 'end_hub' and end_f:
-                raise SystemExit("Error: end_hub cannot be repeated")
-            values = value.split(' ', 13)
-            if len(values) != 4:
-                raise SystemExit("Error: Invalid start-hub format")
-            name, x, y, metadata = values
-            if '-' in name or ' ' in name:
-                raise SystemExit("Error: Hub name cannot contain '-' or spaces")
+            raise SystemExit(f"Error: Invalid key '{key}' in line '{raw_line}'")
+        start_f = False
+        end_f = False
+        if key in {'start_hub', 'end_hub', 'hub'}:
+            hub_f = False
+            if key == 'start_hub':
+                if start_f:
+                    raise SystemExit(f"Error: start_hub cannot be repeated in line '{raw_line}'")
+                elif not 'start_hub' in map:
+                    map[key] = {}
+            if key == 'end_hub':
+                if end_f:
+                    raise SystemExit(f"Error: end_hub cannot be repeated in line '{raw_line}'")
+                elif not 'end_hub' in map:
+                    map[key] = {}
             if key == 'hub':
-                if name in hub_names:
-                    raise SystemExit(f"Error: Hub name '{name}' is already used")
+                hub_f = True
+                if not 'hubs' in map:
+                    map['hubs'] = []
+                map['hubs'].append({})
+            values = value.split()
+            name, x, y, *metadata = values
+            if '-' in name:
+                raise SystemExit(f"Error: Hub name cannot contain '-' in line '{raw_line}'")
+            if name in hub_names:
+                raise SystemExit(f"Error: Hub name '{name}' is already used in line '{raw_line}'")
+            else:
+                if hub_f:
+                    map['hubs'][-1]['name'] = name
                 else:
                     map[key]['name'] = name
-                    hub_names.add(name)
-            map[key]['name'] = name
+                hub_names.add(name)
             try:
-                map[key]['cord'] = (int(x), int(y))
+                if hub_f:
+                    map['hubs'][-1]['cord'] = (int(x), int(y))
+                else:
+                    map[key]['cord'] = (int(x), int(y))
             except ValueError:
-                raise SystemExit("Error: Hub coordinates must be integers")
-            metadata_keys = {'color', 'max_drones'}
-            if key == 'hub':
-                metadata_keys.add('zone')
-            if not metadata.startswith('[') or not metadata.endswith(']'):
-                raise SystemExit("Error: Metadata must be enclosed in []")
-            metadata = metadata.strip('[]')
-            if metadata.count(' ') > 2:
-                raise SystemExit("Error: Metadata in start-hub must contain between 1 and 3 key-value pairs")
-            for item in metadata.split(' ', 2):
+                raise SystemExit(f"Error: Hub coordinates must be integers in line '{raw_line}'")
+            metadata_keys = {'color', 'max_drones', 'zone'}
+            if not metadata[0].startswith('[') or not metadata[-1].endswith(']'):
+                raise SystemExit(f"Error: Metadata must be enclosed in [] in line '{raw_line}'")
+            metadata[0] = metadata[0].lstrip('[')
+            metadata[-1] = metadata[-1].rstrip(']')
+            color_f = False
+            max_drones_f = False
+            zone_f = False
+            for item in metadata:
                 if item.count('=') != 1:
-                    raise SystemExit("Error: More than one '=' found in metadata item")
-                ikey, ivalue = item.split('=', 1)
+                    raise SystemExit(f"Error: More than one '=' found in metadata item in line '{raw_line}'")
+                ikey, ivalue = item.split('=')
                 ikey = ikey.strip()
                 ivalue = ivalue.strip()
                 if not ikey:
-                    raise SystemExit("Error: Metadata key cannot be empty")
+                    raise SystemExit(f"Error: Metadata key cannot be empty in line '{raw_line}'")
                 if not ivalue:
-                    raise SystemExit("Error: Metadata value cannot be empty")
+                    raise SystemExit(f"Error: Metadata value cannot be empty in line '{raw_line}'")
                 if not ikey in metadata_keys:
-                    raise SystemExit(f"Error: Invalid metadata key '{key}'")
+                    raise SystemExit(f"Error: Invalid metadata key '{ikey}' in line '{raw_line}'")
                 if ikey == 'color':
-                    map[key][ikey] = ivalue
-                elif ikey == 'max-drones':
+                    if color_f:
+                        raise SystemExit(f"Error: color metadata cannot be repeated in line '{raw_line}'")
+                    else:
+                        if hub_f:
+                            map['hubs'][-1][ikey] = ivalue
+                        else:
+                            map[key][ikey] = ivalue
+                        color_f = True
+                else:
+                    if hub_f:
+                        map['hubs'][-1]['color'] = 'none'
+                    else:
+                        map[key]['color'] = 'none'
+                if ikey == 'max_drones':
+                    if max_drones_f:
+                        raise SystemExit(f"Error: max_drones metadata cannot be repeated in line '{raw_line}'")
                     try:
-                        map[key][ikey] = int(ivalue)
-                        if map[key][ikey] < 0:
-                            raise SystemExit("Error: max-drones must be a positive integer")
+                        ivalue = int(ivalue)
+                        if ivalue <= 0:
+                            raise SystemExit(f"Error: max_drones must be a positive integer in line '{raw_line}'")
+                        if key in {'start_hub', 'end_hub'} and ivalue < map['nb_drones']:
+                            raise SystemExit(f"Error: max_drones for start_hub and end_hub must be at least nb_drones in line '{raw_line}'")
+                        if hub_f:
+                            map['hubs'][-1][ikey] = ivalue
+                        else:
+                            map[key][ikey] = ivalue
+                        max_drones_f = True
                     except ValueError:
-                        raise SystemExit("Error: max-drones must be an integer")
-                elif ikey == 'zone':
-                    if ikey not in {'normal', 'blocked', 'restricted', 'priority'}:
-                        raise SystemExit("Error: Invalid zone value")
-                    map[key][ikey] = ivalue
+                        raise SystemExit(f"Error: max_drones must be an integer in line '{raw_line}'")
+                else:
+                    if hub_f:
+                        map['hubs'][-1]['max_drones'] = 1
+                    else:
+                        map[key]['max_drones'] = 1
+                if ikey == 'zone':
+                    if zone_f:
+                        raise SystemExit(f"Error: zone metadata cannot be repeated in line '{raw_line}'")
+                    if ikey in {'start_hub', 'end_hub'} and ivalue != 'normal':
+                        raise SystemExit(f"Error: start_hub and end_hub cannot have a zone value other than 'normal' in line '{raw_line}'")
+                    if ivalue not in {'normal', 'blocked', 'restricted', 'priority'}:
+                        raise SystemExit(f"Error: Invalid zone value in line '{raw_line}'")
+                    if hub_f:
+                        map['hubs'][-1][ikey] = ivalue
+                    else:
+                        map[key][ikey] = ivalue
+                    zone_f = True
+                else:
+                    if hub_f:
+                        map['hubs'][-1]['zone'] = 'normal'
+                    else:
+                        map[key]['zone'] = 'normal'
             if key == 'start_hub':
-                start_f = 1
+                start_f = True
             if key == 'end_hub':
-                end_f = 1
+                end_f = True
+        if key == 'connection':
+            if not 'connections' in map:
+                map['connections'] = []
+            map['connections'].append({})
+            if value.count(' ') > 1:
+                raise SystemExit(f"Error: Invalid connection format in line '{raw_line}'")
+            try:
+                connection, max_link_capacity = value.split()
+            except ValueError:
+                connection = value
+                max_link_capacity = None 
+            if connection.count('-') != 1:
+                raise SystemExit(f"Error: Invalid connection format there must be exactly one '-' in the connection in line '{raw_line}'")
+            if not connection.split('-')[0] or not connection.split('-')[1]:
+                raise SystemExit(f"Error: Connection must have a from and to hub in line '{raw_line}'")
+            if connection.split('-')[0] == connection.split('-')[1]:
+                raise SystemExit(f"Error: Connection cannot be between the same hub in line '{raw_line}'")
+            from_hub, to_hub = connection.split('-')
+            for conn in map.get('connections', []):
+                if not conn:
+                    break
+                if {conn["from"], conn["to"]} == {from_hub, to_hub} or {conn["from"], conn["to"]} == {to_hub, from_hub}:
+                    raise SystemExit(f"Error: Connection '{from_hub}-{to_hub}' is duplicated in line '{raw_line}'")
+            if connection.split('-')[0] in hub_names and connection.split('-')[1] in hub_names:
+                map['connections'][-1]['from'] = connection.split('-')[0]
+                map['connections'][-1]['to'] = connection.split('-')[1]
+            else:
+                raise SystemExit(f"Error: Connection hubs must be defined in the hubs section in line '{raw_line}'")
+            if max_link_capacity:
+                if max_link_capacity.count('=') != 1:
+                    raise SystemExit(f"Error: Invalid max_link_capacity format in line '{raw_line}'")
+                if not max_link_capacity.startswith('[') or not max_link_capacity.endswith(']'):
+                    raise SystemExit(f"Error: max_link_capacity must be enclosed in [] in line '{raw_line}'")
+                max_link_capacity = max_link_capacity.lstrip('[').rstrip(']')
+                if max_link_capacity.split('=')[0] != 'max_link_capacity':
+                    raise SystemExit(f"Error: Invalid max_link_capacity format in line '{raw_line}'")
+                try:
+                    value = int(max_link_capacity.split('=')[1])
+                    if value <= 0:
+                        raise SystemExit(f"Error: max_link_capacity must be a positive integer in line '{raw_line}'")
+                except ValueError:
+                    raise SystemExit(f"Error: max_link_capacity must be an integer in line '{raw_line}'")
+                map['connections'][-1]['max_link_capacity'] = value
+            else:
+                map['connections'][-1]['max_link_capacity'] = 1
 
-
-    if len(argv) != 2:
-        raise SystemExit("Error: No file provided.")
-    file = argv[1]
-    if not file.endswith('txt'):
-        raise SystemExit("Error: File must be a .txt file.")
-    try:
-        with open(file, 'r') as f:
-            map = {'start-hub': 
-                   {'name': str, 'cord': tuple, 'color': str, 'max-drones': int},
-                   'end_hub': 
-                   {'name': str, 'cord': tuple, 'color': str, 'max-drones': int},
-                   'hub':
-                    [{'name': str, 'cord': tuple, 'color': str, 'max-drones': int}]}
-
-            lines = [line.strip() for line in f]
-            f = 1
-            for line in lines:
-                line_parser(line, map, f)
-    except FileNotFoundError:
-        raise SystemExit(f"Error: File '{file}' not found.")
-    except PermissionError:
-        raise SystemExit(f"Error: Permission denied for file '{file}'.")
-    except IOError:
-        raise SystemExit(f"Error: Could not read file '{file}'.")
-    except Exception as e:
-        raise SystemExit(f"Error: {str(e)}")
+    @classmethod
+    def file_parser(cls) -> dict[str, Any]:
+        if len(argv) != 2:
+            raise SystemExit("Error: No file provided.")
+        file = argv[1]
+        if not file.endswith('txt'):
+            raise SystemExit("Error: File must be a .txt file.")
+        try:
+            with open(file, 'r') as file:
+                map = {}
+                lines = [line.strip() for line in file if line.strip() and not line.strip().startswith("#")]
+                hub_names = set()
+                f = True
+                for line in lines:
+                    cls.line_parser(line, map, hub_names, f)
+                    f = False
+            return map
+        except FileNotFoundError:
+            raise SystemExit(f"Error: File '{file}' not found.")
+        except PermissionError:
+            raise SystemExit(f"Error: Permission denied for file '{file}'.")
+        except IsADirectoryError:
+            raise SystemExit(f"Error: '{file}' is a directory, not a file.")
+        except IOError:
+            raise SystemExit(f"Error: Could not read file '{file}'.")
+        except Exception as e:
+            raise SystemExit(f"Error: {str(e)}")
