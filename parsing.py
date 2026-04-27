@@ -66,6 +66,20 @@ class Parser:
                     map[key]['cord'] = (int(x), int(y))
             except ValueError:
                 raise SystemExit(f"Error: Hub coordinates must be integers in line '{raw_line}'")
+            if not metadata:
+                if hub_f:
+                    map['hubs'][-1]['color'] = 'none'
+                    map['hubs'][-1]['max_drones'] = 1
+                    map['hubs'][-1]['zone'] = 'normal'
+                else:
+                    map[key]['color'] = 'none'
+                    map[key]['max_drones'] = 1
+                    map[key]['zone'] = 'normal'
+                if key == 'start_hub':
+                    start_f = True
+                if key == 'end_hub':
+                    end_f = True
+                return
             metadata_keys = {'color', 'max_drones', 'zone'}
             if not metadata[0].startswith('[') or not metadata[-1].endswith(']'):
                 raise SystemExit(f"Error: Metadata must be enclosed in [] in line '{raw_line}'")
@@ -76,7 +90,7 @@ class Parser:
             zone_f = False
             for item in metadata:
                 if item.count('=') != 1:
-                    raise SystemExit(f"Error: More than one '=' found in metadata item in line '{raw_line}'")
+                    raise SystemExit(f"Error: Invalid metadata format in line '{raw_line}'")
                 ikey, ivalue = item.split('=')
                 ikey = ikey.strip()
                 ivalue = ivalue.strip()
