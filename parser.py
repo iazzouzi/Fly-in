@@ -154,10 +154,13 @@ class Parser:
             graph.connections.append(Connection(from_hub, to_hub, max_link_capacity))
 
     @classmethod
-    def file_parser(cls) -> Graph:
-        if len(argv) != 2:
+    def file_parser(cls, path: str) -> Graph:
+        if not path and len(argv) != 2:
             raise SystemExit("Error: No file provided.")
-        file = argv[1]
+        if not path:
+            file = argv[1]
+        else:
+            file = path
         if not file.endswith('txt'):
             raise SystemExit("Error: File must be a .txt file.")
         try:

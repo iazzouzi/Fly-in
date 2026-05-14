@@ -3,7 +3,6 @@ from models.graph import Graph
 from models.zone import Zone
 import heapq
 
-
 class Pathfinder:
     @staticmethod
     def dijkstra(graph: Graph) -> list[str]:
