@@ -3,7 +3,7 @@ from pathfinder import Pathfinder
 
 def main() -> None:
 
-    graph = Parser.file_parser(None)
+    graph = Parser.file_parser()
     
     # print(graph.nb_drones)
 
@@ -23,5 +23,8 @@ def main() -> None:
     #     print(key, [hub.name for hub in value])
 
     print('\n', Pathfinder.dijkstra(graph))
+
+
+    print('\n', len(Pathfinder.dfs_all_possible_paths(graph)))
 
 main()

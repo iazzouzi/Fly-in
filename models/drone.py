@@ -1,9 +1,7 @@
 from .zone import Zone
 
 class Drone:
-    def __init__(self, id, position):
+    def __init__(self, id, path, position):
         self.id: int = id
+        self.path: list[str] = path
         self.position: Zone = position
-
-    def __str__(self):
-        return self.id

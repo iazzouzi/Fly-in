@@ -9,6 +9,7 @@ class Zone:
         self.is_start: bool = False
         self.is_end: bool = False
         self.cost: int = 1
+        self.reserved = False
 
     def __str__(self):
         return self.name
