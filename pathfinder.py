@@ -23,33 +23,3 @@ class Pathfinder:
                     continue
                 heapq.heappush(heap, (zone[0] + neighbor.cost, neighbor.name, zone[2] + [neighbor.name]))
         raise SystemExit(f"No path found from {graph.start_hub.name} to {graph.end_hub.name}")
-
-    @staticmethod
-    def dfs_all_possible_paths(graph: Graph):
-        stack = [graph.start_hub.name]
-        visited = set()
-        tried = {}
-        paths = []
-        while stack:
-            zone = stack[-1]
-            visited.add(zone)
-            if not zone in tried:
-                tried[zone] = set()
-            for neighbor in graph.adjacency[zone]:
-                if neighbor.name in tried[zone]:
-                    continue
-                tried[zone].add(neighbor.name)
-                if neighbor.is_end:
-                    paths.append(stack.copy()+[neighbor.name])
-                    continue
-                if neighbor.zone == 'blocked':
-                    continue
-                if neighbor.name in visited:
-                    continue
-                stack.append(neighbor.name)
-                break
-            else:
-                visited.remove(zone)
-                tried.pop(zone)
-                stack.pop()
-        return paths

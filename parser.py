@@ -186,13 +186,5 @@ class Parser:
                             graph.adjacency[hub.name].append(connection.from_zone)
             return graph
 
-        except FileNotFoundError:
-            raise SystemExit(f"Error: File '{file}' not found.")
-        except PermissionError:
-            raise SystemExit(f"Error: Permission denied for file '{file}'.")
-        except IsADirectoryError:
-            raise SystemExit(f"Error: '{file}' is a directory, not a file.")
-        except IOError:
-            raise SystemExit(f"Error: Could not read file '{file}'.")
-        except Exception as e:
-            raise SystemExit(f"Error: {str(e)}")
+        except OSError as e:
+            raise SystemExit(f"Error: Could not read file '{file}' - {e.strerror}")
