@@ -9,6 +9,8 @@ class Parser:
         KEYS = {'start_hub', 'end_hub', 'hub', 'connection'}
         if line.startswith('#'):
             return
+        if '#' in line:
+            line = line.split('#', 1)[0]
         if line.count(':') != 1:
             raise SystemExit(f"Error: Invalid line format, there must be exactly one ':' in the line '{line_nb}'")
         key, value = line.split(':')
@@ -22,12 +24,11 @@ class Parser:
             if key != 'nb_drones':
                 raise SystemExit(f"Error: First line must be nb_drones in line '{line_nb}'")
             try:
-                value = int(value)
-                if value <= 0:
+                if int(value) <= 0:
                     raise SystemExit(f"Error: nb_drones must be a positive integer in line '{line_nb}'")
+                graph.nb_drones = int(value)
             except ValueError:
                 raise SystemExit(f"Error: nb_drones must be an integer in line '{line_nb}'")
-            graph.nb_drones = value
             flags['nb_drones_f'] = False
             return
         if key not in KEYS:
@@ -47,11 +48,9 @@ class Parser:
                 raise SystemExit(f"Error: Hub name '{name}' is already used in line '{line_nb}'")
             hub_names.add(name)
             try:
-                x = int(x)
-                y = int(y)
+                graph.hubs[name] = Zone(name, int(x), int(y))
             except ValueError:
                 raise SystemExit(f"Error: Hub coordinates must be integers in line '{line_nb}'")
-            graph.hubs[name] = Zone(name, x, y)
             if key == 'start_hub':
                 graph.hubs[name].is_start = True
                 graph.start_hub = graph.hubs[name]
@@ -91,12 +90,11 @@ class Parser:
                     if max_drones_f:
                         raise SystemExit(f"Error: max_drones metadata cannot be repeated in line '{line_nb}'")
                     try:
-                        ivalue = int(ivalue)
-                        if ivalue <= 0:
+                        if int(ivalue) <= 0:
                             raise SystemExit(f"Error: max_drones must be a positive integer in line '{line_nb}'")
-                        if key in {'start_hub', 'end_hub'} and ivalue != graph.nb_drones:
+                        graph.hubs[name].max_drones = int(ivalue)
+                        if key in {'start_hub', 'end_hub'} and int(ivalue) != graph.nb_drones:
                             raise SystemExit(f"Error: max_drones for start_hub and end_hub must be equal nb_drones in line '{line_nb}'")
-                        graph.hubs[name].max_drones = ivalue
                         max_drones_f = True
                     except ValueError:
                         raise SystemExit(f"Error: max_drones must be an integer in line '{line_nb}'")
@@ -130,8 +128,8 @@ class Parser:
                 if {conn.from_zone.name, conn.to_zone.name} == {from_hub, to_hub} or {conn.from_zone.name, conn.to_zone.name} == {to_hub, from_hub}:
                     raise SystemExit(f"Error: Connection '{from_hub}-{to_hub}' is duplicated in line '{line_nb}'")
             if connection.split('-')[0] in hub_names and connection.split('-')[1] in hub_names:
-                from_hub = graph.hubs[connection.split('-')[0]]
-                to_hub = graph.hubs[connection.split('-')[1]]
+                from_shub = graph.hubs[connection.split('-')[0]]
+                to_shub = graph.hubs[connection.split('-')[1]]
             else:
                 raise SystemExit(f"Error: Connection hubs must be defined in the hubs section in line '{line_nb}'")
             if max_link_capacity:
@@ -143,15 +141,14 @@ class Parser:
                 if max_link_capacity.split('=')[0] != 'max_link_capacity':
                     raise SystemExit(f"Error: Invalid max_link_capacity format in line '{line_nb}'")
                 try:
-                    value = int(max_link_capacity.split('=')[1])
-                    if value <= 0:
+                    if int(max_link_capacity.split('=')[1]) <= 0:
                         raise SystemExit(f"Error: max_link_capacity must be a positive integer in line '{line_nb}'")
+                    capacity = int(max_link_capacity.split('=')[1])
                 except ValueError:
                     raise SystemExit(f"Error: max_link_capacity must be an integer in line '{line_nb}'")
-                max_link_capacity = value
             else:
-                max_link_capacity = 1
-            graph.connections.append(Connection(from_hub, to_hub, max_link_capacity))
+                capacity = 1
+            graph.connections.append(Connection(from_shub, to_shub, capacity))
 
     @classmethod
     def file_parser(cls) -> Graph:
@@ -161,15 +158,13 @@ class Parser:
         if not file.endswith('txt'):
             raise SystemExit("Error: File must be a .txt file.")
         try:
-            with open(file, 'r') as file:
+            with open(file, 'r') as f:
                 graph = Graph()
-                lines = [line.strip() for line in file if line.strip()]
-                hub_names = set()
+                lines = [line.strip() for line in f if line.strip()]
+                hub_names: set[str] = set()
                 flags = {'start_f': False, 'end_f': False, 'nb_drones_f': True}
                 for line_nb, line in enumerate(lines):
                     cls.line_parser(line, line_nb+1, graph, hub_names, flags)
-            if not graph.nb_drones:
-                raise SystemExit("Error: nb_drones is missing.")
             if not graph.start_hub:
                 raise SystemExit("Error: start_hub is missing.")
             if not graph.end_hub:

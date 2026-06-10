@@ -1,10 +1,11 @@
 from parser import Parser
-from pathfinder import Pathfinder
+from engine import Engine
 
 def main() -> None:
 
     graph = Parser.file_parser()
 
-    print(Pathfinder.dijkstra(graph))
+    Engine.simulator(graph)
+
 
 main()

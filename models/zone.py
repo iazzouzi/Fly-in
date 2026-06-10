@@ -1,17 +1,18 @@
 class Zone:
-    def __init__(self, name, x, y):
-        self.name: str = name
-        self.x: int = x
-        self.y: int = y
+    def __init__(self, name: str, x: int, y: int) -> None:
+        self.name = name
+        self.x = x
+        self.y = y
         self.zone: str = 'normal'
         self.max_drones: int = 1
         self.color: str = 'none'
         self.is_start: bool = False
         self.is_end: bool = False
         self.cost: int = 1
-        self.reserved = False
+        self.reserved: int = 0
+        self.capacity: int = 0
 
-    def __str__(self):
+    def __repr__(self) -> str:
         return self.name
     
 
