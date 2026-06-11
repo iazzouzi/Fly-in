@@ -47,11 +47,11 @@ class Engine:
         tmp = set()
         base = {'f': 1, 'base': 0}
 
-        # def connection(from_zone: Zone, to_zone: Zone) -> Connection:
-        #     for conn in graph.connections:
-        #         if from_zone is conn.from_zone and to_zone is conn.to_zone:
-        #             return conn
-        #     return None
+        def connection(from_zone: Zone, to_zone: Zone) -> Connection:
+            for conn in graph.connections:
+                if from_zone is conn.from_zone and to_zone is conn.to_zone:
+                    return conn
+            return None
 
         while delivered < graph.nb_drones:
             line = ""
@@ -70,20 +70,14 @@ class Engine:
                             delivered += 1
                         elif drones[i].position.capacity == drones[i].position.max_drones:
                             drones[i].position.reserved = 1
-                        
+
                         tmp.remove(drones[i])
                     i += 1
                     continue
 
-                else:
-                    if drones[i].position.capacity:
-                        drones[i].position.capacity -= 1
-                    if drones[i].position.reserved:
-                        drones[i].position.reserved = 0
-
                 nxt = cls.next(graph, drones[i], base)
                 if nxt:
-                    if nxt.cost == 2:
+                    if nxt.zone == 'restricted':
                         line += f"D{drones[i].id}-{drones[i].position}--{nxt} "
                         drones[i].position.reserved = 0
                         drones[i].position.capacity -= 1
@@ -91,14 +85,14 @@ class Engine:
                         drones[i].path.append(nxt)
                         tmp.add(drones[i])
                         i += 1
-                        continue
                     else:
-                        # position = drones[i].position
-                        # nbs = []
-                        # for drone in drones:
-                        #     if not drone.id == drones[i].id and drone.position.name == position.name:
-                        #         nbs.append(drone.id)
-
+                        position = drones[i].position
+                        nbs = []
+                        for drone in drones:
+                            if not drone.id == drones[i].id and drone.position.name == position.name:
+                                nbs.append(drone.id)
+                        drones[i].position.reserved = 0
+                        drones[i].position.capacity -= 1
                         drones[i].position = nxt
                         drones[i].path.append(nxt)
                         drones[i].position.capacity += 1
@@ -109,22 +103,22 @@ class Engine:
                         elif drones[i].position.capacity == drones[i].position.max_drones:
                             drones[i].position.reserved = 1
 
-                        # if nbs:
-                        #     conn = connection(position, nxt)
-                        #     if conn:
-                        #         for nb in nbs:
-                        #             while nxt.reserved == 0 and nxt.capacity < conn.max_link_capacity:
-                        #                 if drones[nb] in tmp:
-                        #                     tmp.remove(drones[nb])
-                        #                 drones[nb].position = nxt
-                        #                 drones[nb].path.append(nxt)
-                        #                 drones[nb].position.capacity += 1
-                        #                 line += f"D{drones[nb].id}-{drones[nb].position} "
-                        #                 if drones[nb].position.is_end:
-                        #                     drones[nb].delivered = 1
-                        #                     delivered += 1
-                        #                 elif nxt.capacity == nxt.max_drones:
-                        #                     nxt.reserved = 1
+                        if nbs:
+                            conn = connection(position, nxt)
+                            if conn:
+                                for nb in nbs:
+                                    while nxt.reserved == 0 and nxt.capacity < conn.max_link_capacity:
+                                        if drones[nb] in tmp:
+                                            tmp.remove(drones[nb])
+                                        drones[nb].position = nxt
+                                        drones[nb].path.append(nxt)
+                                        drones[nb].position.capacity += 1
+                                        line += f"D{drones[nb].id}-{drones[nb].position} "
+                                        if drones[nb].position.is_end:
+                                            drones[nb].delivered = 1
+                                            delivered += 1
+                                        elif nxt.capacity == nxt.max_drones:
+                                            nxt.reserved = 1
                         i += 1
                 else:
                     i += 1
