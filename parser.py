@@ -105,9 +105,9 @@ class Parser:
                         raise SystemExit(f"Error: Invalid zone value in line '{line_nb}'")
                     graph.hubs[name].zone = ivalue
                     if ivalue == 'restricted':
-                        graph.hubs[name].cost = 2
-                    elif ivalue == 'blocked':
-                        graph.hubs[name].cost = 0
+                        graph.hubs[name].cost = 2.0
+                    elif ivalue == 'priority':
+                        graph.hubs[name].cost = 0.2
                     zone_f = True
         if key == 'connection':
             if value.count(' ') > 1:

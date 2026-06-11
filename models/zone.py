@@ -8,7 +8,7 @@ class Zone:
         self.color: str = 'none'
         self.is_start: bool = False
         self.is_end: bool = False
-        self.cost: int = 1
+        self.cost: float = 1.0
         self.reserved: int = 0
         self.capacity: int = 0
 
