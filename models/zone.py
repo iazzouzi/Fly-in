@@ -10,7 +10,8 @@ class Zone:
         self.is_end: bool = False
         self.cost: float = 1.0
         self.reserved: int = 0
-        self.capacity: int = 0
+        from .drone import Drone
+        self.occupancy: list[Drone] = []
 
     def __repr__(self) -> str:
         return self.name
