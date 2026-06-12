@@ -93,5 +93,5 @@ class Engine:
                         i += 1
                 else:
                     i += 1
-            # print(line)
+            print(line)
         return turns

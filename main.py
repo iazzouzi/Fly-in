@@ -7,7 +7,7 @@ def main() -> None:
 
     turns = Engine.simulator(graph)
 
-    for turn in turns:
-        print(turn)
+    # for turn in turns:
+    #     print(turn)
 
 main()
