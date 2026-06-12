@@ -39,12 +39,14 @@ class Engine:
 
 
     @classmethod
-    def simulator(cls, graph: Graph) -> None:
+    def simulator(cls, graph: Graph) -> list[list[tuple[int, Zone, Zone, int]]]:
         drones: list[Drone] = [Drone(i, [], graph.start_hub) for i in range(1, graph.nb_drones+1)]
+        turns: list[list[tuple[int, Zone, Zone, int]]] = []
         delivered = 0
         tmp: set[Drone] = set()
         base = {'f': 1, 'base': 0.0}
         while delivered < graph.nb_drones:
+            turns.append([])
             line = ""
             i = 0
             while i < len(drones):
@@ -64,6 +66,7 @@ class Engine:
                 if nxt:
                     if nxt.zone == 'restricted':
                         line += f"D{drones[i].id}-{pos}--{nxt} "
+                        turns[-1].append((drones[i].id, pos, nxt, 1))
                         pos.reserved = 0
                         if drones[i] in pos.occupancy:
                             pos.occupancy.remove(drones[i])
@@ -75,6 +78,7 @@ class Engine:
                         i += 1
                     else:
                         line += f"D{drones[i].id}-{nxt} "
+                        turns[-1].append((drones[i].id, pos, nxt, 0))
                         pos.reserved = 0
                         if drones[i] in pos.occupancy:
                             pos.occupancy.remove(drones[i])
@@ -89,4 +93,5 @@ class Engine:
                         i += 1
                 else:
                     i += 1
-            print(line)
+            # print(line)
+        return turns
