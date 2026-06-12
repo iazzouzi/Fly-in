@@ -1,4 +1,3 @@
-from models.connection import Connection
 from models.graph import Graph
 from models.drone import Drone
 from models.zone import Zone
@@ -23,7 +22,7 @@ class Engine:
                 if base['f']:
                     base['base'] = costcal(drone.path + [graph.hubs[hub] for hub in path])
                     base['f'] = 0
-                if costcal(drone.path + [graph.hubs[hub] for hub in path]) > base['base']:
+                if costcal(drone.path + [graph.hubs[hub] for hub in path]) != base['base']:
                     return None
                 else:
                     return graph.hubs[path[0]]
@@ -54,15 +53,11 @@ class Engine:
                     i += 1
                     continue
                 elif drones[i] in tmp:
-                    if not pos.reserved:
-                        pos.occupancy.append(drones[i])
-                        line += f"D{drones[i].id}-{pos} "
-                        if pos.is_end:
-                            drones[i].delivered = 1
-                            delivered += 1
-                        elif len(pos.occupancy) == pos.max_drones:
-                            pos.reserved = 1
-                        tmp.remove(drones[i])
+                    line += f"D{drones[i].id}-{pos} "
+                    if pos.is_end:
+                        drones[i].delivered = 1
+                        delivered += 1
+                    tmp.remove(drones[i])
                     i += 1
                     continue
                 nxt = cls.next(graph, drones[i], base)
@@ -74,6 +69,8 @@ class Engine:
                             pos.occupancy.remove(drones[i])
                         drones[i].position = nxt
                         drones[i].path.append(nxt)
+                        nxt.occupancy.append(drones[i])
+                        nxt.reserved = 1
                         tmp.add(drones[i])
                         i += 1
                     else:
@@ -83,12 +80,12 @@ class Engine:
                             pos.occupancy.remove(drones[i])
                         drones[i].position = nxt
                         drones[i].path.append(nxt)
-                        drones[i].position.occupancy.append(drones[i])
-                        if drones[i].position.is_end:
+                        nxt.occupancy.append(drones[i])
+                        if nxt.is_end:
                             drones[i].delivered = 1
                             delivered += 1
-                        elif len(drones[i].position.occupancy) == drones[i].position.max_drones:
-                            drones[i].position.reserved = 1
+                        elif len(nxt.occupancy) == nxt.max_drones:
+                            nxt.reserved = 1
                         i += 1
                 else:
                     i += 1
