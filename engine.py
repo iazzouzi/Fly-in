@@ -74,7 +74,7 @@ class Engine:
                 if nxt:
                     if nxt.zone == 'restricted':
                         line += f"D{drones[i].id}-{pos}--{nxt} "
-                        turns[-1].append((drones[i].id, pos, nxt, 1))
+                        turns[-1].append({'drones': [drones[i]], 'from': pos, 'to': nxt, 'cost2': 1})
                         pos.reserved = 0
                         pos.occupancy.remove(drones[i])
                         drones[i].position = nxt
@@ -87,7 +87,7 @@ class Engine:
                     else:
                         if len(pos.occupancy) > 1 and nxt.max_drones > 1 and get_conn_capacity(pos, nxt) > 1:
                             conn_capacity = get_conn_capacity(pos, nxt)
-                            tmp_list = []
+                            turns[-1].append({'drones': [], 'from': pos, 'to': nxt, 'cost2': 0})
                             u = 0
                             while u <= len(pos.occupancy) and u < conn_capacity and nxt.reserved == 0:
                                 drone = pos.occupancy[0]
@@ -95,7 +95,7 @@ class Engine:
                                     u += 1
                                     continue
                                 line += f"D{drone.id}-"
-                                tmp_list.append(drone.id)
+                                turns[-1][-1]['drones'].append(drone)
                                 pos.reserved = 0
                                 pos.occupancy.remove(drone)
                                 drone.position = nxt
@@ -109,12 +109,10 @@ class Engine:
                                 stmp.add(drone)
                                 u += 1
                             line += f"{nxt} "
-                            tmp_list += [pos, nxt, 0]
-                            turns[-1].append(tuple(tmp_list))
                             i += 1
                         else:
                             line += f"D{drones[i].id}-{nxt} "
-                            turns[-1].append((drones[i].id, pos, nxt, 0))
+                            turns[-1].append({'drones': [drones[i]], 'from': pos, 'to': nxt, 'cost2': 0})
                             pos.reserved = 0
                             pos.occupancy.remove(drones[i])
                             drones[i].position = nxt
