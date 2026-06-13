@@ -58,11 +58,11 @@ class Engine:
             line = ""
             i = 0
             while i < len(drones):
-                pos = drones[i].position
-                if drones[i].delivered:
+                if drones[i].delivered or drones[i] in stmp:
                     i += 1
                     continue
-                elif drones[i] in tmp:
+                pos = drones[i].position
+                if drones[i] in tmp:
                     line += f"D{drones[i].id}-{pos} "
                     if pos.is_end:
                         drones[i].delivered = 1
@@ -87,14 +87,15 @@ class Engine:
                     else:
                         if len(pos.occupancy) > 1 and nxt.max_drones > 1 and get_conn_capacity(pos, nxt) > 1:
                             conn_capacity = get_conn_capacity(pos, nxt)
+                            tmp_list = []
                             u = 0
-                            while u < len(pos.occupancy) and u < conn_capacity and nxt.reserved == 0:
-                                drone = pos.occupancy[u]
+                            while u <= len(pos.occupancy) and u < conn_capacity and nxt.reserved == 0:
+                                drone = pos.occupancy[0]
                                 if drone in stmp:
                                     u += 1
                                     continue
-                                line += f"D{drone.id}-{nxt} "
-                                turns[-1].append((drone.id, pos, nxt, 0))
+                                line += f"D{drone.id}-"
+                                tmp_list.append(drone.id)
                                 pos.reserved = 0
                                 pos.occupancy.remove(drone)
                                 drone.position = nxt
@@ -103,10 +104,13 @@ class Engine:
                                 if nxt.is_end:
                                     drone.delivered = 1
                                     delivered += 1
-                                elif len(nxt.occupancy) == get_conn_capacity(pos, nxt) or len(nxt.occupancy) == nxt.max_drones:
+                                elif len(nxt.occupancy) == nxt.max_drones:
                                     nxt.reserved = 1
                                 stmp.add(drone)
                                 u += 1
+                            line += f"{nxt} "
+                            tmp_list += [pos, nxt, 0]
+                            turns[-1].append(tuple(tmp_list))
                             i += 1
                         else:
                             line += f"D{drones[i].id}-{nxt} "
@@ -119,7 +123,7 @@ class Engine:
                             if nxt.is_end:
                                 drones[i].delivered = 1
                                 delivered += 1
-                            elif len(nxt.occupancy) == get_conn_capacity(pos, nxt) or len(nxt.occupancy) == nxt.max_drones:
+                            elif len(nxt.occupancy) == nxt.max_drones:
                                 nxt.reserved = 1
                             stmp.add(drones[i])
                             i += 1
