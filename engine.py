@@ -1,3 +1,4 @@
+from models.connection import Connection
 from models.graph import Graph
 from models.drone import Drone
 from models.zone import Zone
@@ -40,13 +41,20 @@ class Engine:
 
     @classmethod
     def simulator(cls, graph: Graph) -> list[list[tuple[int, Zone, Zone, int]]]:
+        def get_conn_capacity(from_zone, to_zone) -> int:
+            for conn in graph.connections:
+                if conn.from_zone is from_zone and conn.to_zone is to_zone:
+                    return conn.max_link_capacity
         drones: list[Drone] = [Drone(i, [], graph.start_hub) for i in range(1, graph.nb_drones+1)]
+        for drone in drones:
+            graph.start_hub.occupancy.append(drone)
         turns: list[list[tuple[int, Zone, Zone, int]]] = []
         delivered = 0
         tmp: set[Drone] = set()
         base = {'f': 1, 'base': 0.0}
         while delivered < graph.nb_drones:
             turns.append([])
+            stmp = set()
             line = ""
             i = 0
             while i < len(drones):
@@ -68,29 +76,53 @@ class Engine:
                         line += f"D{drones[i].id}-{pos}--{nxt} "
                         turns[-1].append((drones[i].id, pos, nxt, 1))
                         pos.reserved = 0
-                        if drones[i] in pos.occupancy:
-                            pos.occupancy.remove(drones[i])
+                        pos.occupancy.remove(drones[i])
                         drones[i].position = nxt
                         drones[i].path.append(nxt)
-                        nxt.occupancy.append(drones[i])
                         nxt.reserved = 1
+                        nxt.occupancy.append(drones[i])
                         tmp.add(drones[i])
+                        stmp.add(drones[i])
                         i += 1
                     else:
-                        line += f"D{drones[i].id}-{nxt} "
-                        turns[-1].append((drones[i].id, pos, nxt, 0))
-                        pos.reserved = 0
-                        if drones[i] in pos.occupancy:
+                        if len(pos.occupancy) > 1 and nxt.max_drones > 1 and get_conn_capacity(pos, nxt) > 1:
+                            conn_capacity = get_conn_capacity(pos, nxt)
+                            u = 0
+                            while u < len(pos.occupancy) and u < conn_capacity and nxt.reserved == 0:
+                                drone = pos.occupancy[u]
+                                if drone in stmp:
+                                    u += 1
+                                    continue
+                                line += f"D{drone.id}-{nxt} "
+                                turns[-1].append((drone.id, pos, nxt, 0))
+                                pos.reserved = 0
+                                pos.occupancy.remove(drone)
+                                drone.position = nxt
+                                drone.path.append(nxt)
+                                nxt.occupancy.append(drone)
+                                if nxt.is_end:
+                                    drone.delivered = 1
+                                    delivered += 1
+                                elif len(nxt.occupancy) == get_conn_capacity(pos, nxt) or len(nxt.occupancy) == nxt.max_drones:
+                                    nxt.reserved = 1
+                                stmp.add(drone)
+                                u += 1
+                            i += 1
+                        else:
+                            line += f"D{drones[i].id}-{nxt} "
+                            turns[-1].append((drones[i].id, pos, nxt, 0))
+                            pos.reserved = 0
                             pos.occupancy.remove(drones[i])
-                        drones[i].position = nxt
-                        drones[i].path.append(nxt)
-                        nxt.occupancy.append(drones[i])
-                        if nxt.is_end:
-                            drones[i].delivered = 1
-                            delivered += 1
-                        elif len(nxt.occupancy) == nxt.max_drones:
-                            nxt.reserved = 1
-                        i += 1
+                            drones[i].position = nxt
+                            drones[i].path.append(nxt)
+                            nxt.occupancy.append(drones[i])
+                            if nxt.is_end:
+                                drones[i].delivered = 1
+                                delivered += 1
+                            elif len(nxt.occupancy) == get_conn_capacity(pos, nxt) or len(nxt.occupancy) == nxt.max_drones:
+                                nxt.reserved = 1
+                            stmp.add(drones[i])
+                            i += 1
                 else:
                     i += 1
             print(line)
