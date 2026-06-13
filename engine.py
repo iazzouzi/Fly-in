@@ -40,15 +40,16 @@ class Engine:
 
 
     @classmethod
-    def simulator(cls, graph: Graph) -> list[list[tuple[int, Zone, Zone, int]]]:
-        def get_conn_capacity(from_zone, to_zone) -> int:
+    def simulator(cls, graph: Graph) -> list[list[dict[str, list[Drone] | Zone | int]]]:
+        def get_conn_capacity(zone_a: Zone, zone_b: Zone) -> int:
             for conn in graph.connections:
-                if conn.from_zone is from_zone and conn.to_zone is to_zone:
+                if conn.from_zone is zone_a and conn.to_zone is zone_b or conn.from_zone is zone_b and conn.to_zone is zone_a:
                     return conn.max_link_capacity
+            return 1
         drones: list[Drone] = [Drone(i, [], graph.start_hub) for i in range(1, graph.nb_drones+1)]
         for drone in drones:
             graph.start_hub.occupancy.append(drone)
-        turns: list[list[tuple[int, Zone, Zone, int]]] = []
+        turns: list[list[dict[str, list[Drone] | Zone | int]]] = []
         delivered = 0
         tmp: set[Drone] = set()
         base = {'f': 1, 'base': 0.0}
@@ -73,7 +74,7 @@ class Engine:
                 nxt = cls.next(graph, drones[i], base)
                 if nxt:
                     if nxt.zone == 'restricted':
-                        line += f"D{drones[i].id}-{pos}--{nxt} "
+                        line += f"D{drones[i].id}-{pos}-{nxt} "
                         turns[-1].append({'drones': [drones[i]], 'from': pos, 'to': nxt, 'cost2': 1})
                         pos.reserved = 0
                         pos.occupancy.remove(drones[i])
@@ -94,7 +95,8 @@ class Engine:
                                 if drone in stmp:
                                     u += 1
                                     continue
-                                line += f"D{drone.id}-"
+                                line += f"D{drone.id}-{nxt} "
+                                assert isinstance(turns[-1][-1]['drones'], list)
                                 turns[-1][-1]['drones'].append(drone)
                                 pos.reserved = 0
                                 pos.occupancy.remove(drone)
@@ -108,7 +110,6 @@ class Engine:
                                     nxt.reserved = 1
                                 stmp.add(drone)
                                 u += 1
-                            line += f"{nxt} "
                             i += 1
                         else:
                             line += f"D{drones[i].id}-{nxt} "

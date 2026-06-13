@@ -1,5 +1,6 @@
 from parser import Parser
 from engine import Engine
+# from visualizer import Visualizer
 
 def main() -> None:
 
@@ -7,7 +8,7 @@ def main() -> None:
 
     turns = Engine.simulator(graph)
 
-    # for turn in turns:
-    #     print(turn)
+    # visualizer = Visualizer(graph, turns)
+    # visualizer.run()
 
 main()
