@@ -1,7 +1,7 @@
 from sys import argv
-from models.zone import Zone
-from models.graph import Graph
-from models.connection import Connection
+from zone import Zone
+from graph import Graph
+from connection import Connection
 
 class Parser:
     @staticmethod

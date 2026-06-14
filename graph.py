@@ -1,5 +1,5 @@
-from .zone import Zone
-from .connection import Connection
+from zone import Zone
+from connection import Connection
 
 class Graph:
     def __init__(self) -> None:

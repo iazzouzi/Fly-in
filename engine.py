@@ -1,7 +1,7 @@
-from models.connection import Connection
-from models.graph import Graph
-from models.drone import Drone
-from models.zone import Zone
+from connection import Connection
+from graph import Graph
+from drone import Drone
+from zone import Zone
 import heapq
 
 class Engine:

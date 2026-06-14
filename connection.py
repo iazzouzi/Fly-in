@@ -1,4 +1,4 @@
-from .zone import Zone
+from zone import Zone
 class Connection:
     def __init__(self, from_zone: Zone, to_zone: Zone, max_link_capacity: int) -> None:
         self.from_zone = from_zone
