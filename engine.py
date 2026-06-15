@@ -48,6 +48,7 @@ class Engine:
             return 1
         drones: list[Drone] = [Drone(i, [], graph.start_hub) for i in range(1, graph.nb_drones+1)]
         for drone in drones:
+            graph.drones.append(drone)
             graph.start_hub.occupancy.append(drone)
         turns: list[list[dict[str, list[Drone] | Zone | int]]] = []
         delivered = 0

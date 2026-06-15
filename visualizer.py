@@ -33,35 +33,43 @@ class Window(arcade.Window):
         self.turns = TURNS
         self.counter = 0
         self.play = False
+        self.turn = self.turns[self.counter]
         self.camera = arcade.Camera2D()
         self.manager = UIManager()
-        self.manager.add(UILabel(text=f"Turns: {self.counter}", x=20, y=self.height-60, bold=True, text_color=COLOR['black'], font_size=30))
         self.manager.enable()
         self.labels:list[arcade.Text] = []
-        # self.drones_id = []
-        # for i in range(1, self.nb_drones+1):
-        #     self.drones_id.append(arcade.Text(str(i), drone.x*300, drone.y*300, COLOR['black'], anchor_x= "center", anchor_y="center", font_size=26, bold=True))
-
-        self.gen_labels()
-
-    def gen_labels(self):
         for hub in self.graph.hubs.values():
             x = hub.x*300
-            if hub.name in {'conv_restricted2', 'conv_restricted5', 'conv_restricted8', 'priority_correct', 'priority_bypass2', 'restricted_tunnel2'}:
-                y = hub.y*600-130
+            y = hub.y*600-90
+            if hub.is_start or hub.is_end:
+                self.labels.append(arcade.Text(hub.name, x, y, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True))
             else:
-                y = hub.y*600+90
-            self.labels.append(arcade.Text(hub.name, x, y, COLOR[hub.color], anchor_x= "center", anchor_y="bottom", font_size=26, bold=True))
+                self.labels.append(arcade.Text(hub.name, x, y, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True, rotation=13))
+        for drone in self.graph.drones:
+            drone.x = self.graph.start_hub.x
+            drone.y = self.graph.start_hub.y
 
+    def turn_nb(self):
+        return arcade.Text(f"Turns: {self.counter}/{len(self.turns)}", 0, 1900, COLOR['black'], 160, bold=True)
+    
+    @staticmethod
+    def drone_nb(drone: Drone) -> arcade.Text:
+        return arcade.Text(str(drone.id), drone.x*300, drone.y*600, COLOR['black'], anchor_x= "center", anchor_y="center", font_size=26, bold=True)
 
     def on_update(self, delta_time):
-        pass
 
+        if self.counter == len(self.turns):
+            self.play = False
+            self.counter = 0
+            self.turn = self.turns[self.counter]
+            for drone in self.graph.drones:
+                drone.x = self.graph.start_hub.x
+                drone.y = self.graph.start_hub.y
 
     def on_draw(self):
         self.clear()
         self.camera.use()
-        self.manager.draw()
+        self.turn_nb().draw()
 
         for conn in self.graph.connections:
             arcade.draw_line(conn.from_zone.x*300, conn.from_zone.y*600, conn.to_zone.x*300, conn.to_zone.y*600, COLOR['black'], 6)
@@ -73,12 +81,9 @@ class Window(arcade.Window):
         for label in self.labels:
             label.draw()
 
-        # if self.play:
-        #     for turn in self.turns:
-        #         for mv in turn:
-        #             for drone in mv['drones']:
-        #                 arcade.draw_circle_filled(x*300, y*600, 30, COLOR['gold'])
-        #                 arcade.draw_text(str(drone.id), drone.x*300, drone.y*300, COLOR['black'], anchor_x= "center", anchor_y="center", font_size=26, bold=True)
+        for drone in self.graph.drones:
+            arcade.draw_circle_filled(drone.x*300, drone.y*600, 30, COLOR['gold'])
+            self.drone_nb(drone).draw()
 
     def on_resize(self, width: float, height: float):
         super().on_resize(width, height)
@@ -100,7 +105,10 @@ class Window(arcade.Window):
 
     def on_key_press(self, key, modifiers):
         if arcade.key.SPACE:
-            self.play = True
+            if self.play:
+                self.play = False
+            else:
+                self.play = True
 
 class Visualizer:
     @staticmethod

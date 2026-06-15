@@ -1,4 +1,5 @@
 from zone import Zone
+from drone import Drone
 from connection import Connection
 
 class Graph:
@@ -9,3 +10,4 @@ class Graph:
         self.hubs: dict[str, Zone] = {}
         self.connections: list[Connection] = []
         self.adjacency: dict[str, list[Zone]] = {}
+        self.drones: list[Drone] = []
