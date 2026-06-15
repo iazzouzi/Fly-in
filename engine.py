@@ -66,6 +66,7 @@ class Engine:
                 pos = drones[i].position
                 if drones[i] in tmp:
                     line += f"D{drones[i].id}-{pos} "
+                    turns[-1].append({'drones': [drones[i]], 'from': drones[i].path[-2], 'to': pos, 'cost2': 0, 'f': 1})
                     if pos.is_end:
                         drones[i].delivered = 1
                         delivered += 1
@@ -76,7 +77,7 @@ class Engine:
                 if nxt:
                     if nxt.zone == 'restricted':
                         line += f"D{drones[i].id}-{pos}-{nxt} "
-                        turns[-1].append({'drones': [drones[i]], 'from': pos, 'to': nxt, 'cost2': 1})
+                        turns[-1].append({'drones': [drones[i]], 'from': pos, 'to': nxt, 'cost2': 1, 'f': 0})
                         pos.reserved = 0
                         pos.occupancy.remove(drones[i])
                         drones[i].position = nxt
@@ -89,7 +90,7 @@ class Engine:
                     else:
                         if len(pos.occupancy) > 1 and nxt.max_drones > 1 and get_conn_capacity(pos, nxt) > 1:
                             conn_capacity = get_conn_capacity(pos, nxt)
-                            turns[-1].append({'drones': [], 'from': pos, 'to': nxt, 'cost2': 0})
+                            turns[-1].append({'drones': [], 'from': pos, 'to': nxt, 'cost2': 0, 'f': 0})
                             u = 0
                             while u <= len(pos.occupancy) and u < conn_capacity and nxt.reserved == 0:
                                 drone = pos.occupancy[0]
@@ -114,7 +115,7 @@ class Engine:
                             i += 1
                         else:
                             line += f"D{drones[i].id}-{nxt} "
-                            turns[-1].append({'drones': [drones[i]], 'from': pos, 'to': nxt, 'cost2': 0})
+                            turns[-1].append({'drones': [drones[i]], 'from': pos, 'to': nxt, 'cost2': 0, 'f': 0})
                             pos.reserved = 0
                             pos.occupancy.remove(drones[i])
                             drones[i].position = nxt

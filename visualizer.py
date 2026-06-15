@@ -33,8 +33,21 @@ class Window(arcade.Window):
         self.turns = TURNS
         self.counter = 0
         self.play = False
+        self.r = False
         self.turn = self.turns[self.counter]
         self.camera = arcade.Camera2D()
+        self.camera.zoom = 0.2
+
+        x = 0
+        for hub in self.graph.hubs.values():
+            if hub.x > x:
+                x = hub.x
+        self.camera.position = (x*149, 0)
+
+        for drone in self.graph.drones:
+            drone.x = self.graph.start_hub.x
+            drone.y = self.graph.start_hub.y
+
         self.labels:list[arcade.Text] = []
         for hub in self.graph.hubs.values():
             x = hub.x*300
@@ -43,9 +56,6 @@ class Window(arcade.Window):
                 self.labels.append(arcade.Text(hub.name, x, y, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True))
             else:
                 self.labels.append(arcade.Text(hub.name, x, y, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True, rotation=13))
-        for drone in self.graph.drones:
-            drone.x = self.graph.start_hub.x
-            drone.y = self.graph.start_hub.y
 
     def turn_nb(self):
         return arcade.Text(f"Turns: {self.counter}/{len(self.turns)}", 0, 1900, COLOR['black'], 160, bold=True)
@@ -68,22 +78,59 @@ class Window(arcade.Window):
             arrived = True
             for mv in self.turn:
                 for drone in mv['drones']:
-                    dx = mv['to'].x - drone.x
-                    dy = mv['to'].y - drone.y
-                    distance = sqrt(dx**2+dy**2)
-
-                    if distance < 0.1:
-                        drone.x = mv['to'].x
-                        drone.y = mv['to'].y
+                    if mv['cost2']:
+                        x1 = mv['from'].x
+                        if mv['to'].x == x1:
+                            x2 = mv['to'].x
+                        else:
+                            x2 = (mv['to'].x+x1)/2
+                        y1 = mv['from'].y
+                        if mv['to'].y == y1:
+                            y2 = mv['to'].y
+                        else:
+                            y2 = (mv['to'].y+y1)/2
+                    elif mv['f']:
+                        x2 = mv['to'].x
+                        if mv['from'].x == x2:
+                            x1 = mv['from'].x
+                        else:
+                            x1 = (x2+mv['from'].x)/2
+                        y2 = mv['to'].y
+                        if mv['from'].y == y2:
+                            y1 = mv['from'].y
+                        else:
+                            y1 = (y2+mv['from'].y)/2
                     else:
-                        drone.x += (dx/distance)*delta_time*3
-                        drone.y += (dy/distance)*delta_time*3
+                        x1 = mv['from'].x
+                        x2 = mv['to'].x
+                        y1 = mv['from'].y
+                        y2 = mv['to'].y
+
+                    distance = sqrt((x2-x1)**2+(y2-y1)**2)
+                    dx = x2 - drone.x
+                    dy = y2 - drone.y
+                    remain = sqrt(dx**2+dy**2)
+
+                    if remain < 0.1:
+                        drone.x = x2
+                        drone.y = y2
+                    else:
+                        drone.x += (dx/remain)*delta_time*distance
+                        drone.y += (dy/remain)*delta_time*distance
                         arrived = False
 
             if arrived:
                 self.counter += 1
                 if self.counter < len(self.turns):
                     self.turn = self.turns[self.counter] 
+            
+        if self.r:
+            self.counter = 0
+            self.turn = self.turns[self.counter]
+            for drone in self.graph.drones:
+                drone.x = self.graph.start_hub.x
+                drone.y = self.graph.start_hub.y
+            self.r = False
 
 
     def on_draw(self):
@@ -124,11 +171,13 @@ class Window(arcade.Window):
 
 
     def on_key_press(self, key, modifiers):
-        if arcade.key.SPACE:
+        if key == arcade.key.SPACE:
             if self.play:
                 self.play = False
             else:
                 self.play = True
+        elif key == arcade.key.BACKSPACE:
+            self.r = True
 
 class Visualizer:
     @staticmethod

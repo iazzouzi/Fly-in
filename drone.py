@@ -1,5 +1,4 @@
 from zone import Zone
-
 class Drone:
     def __init__(self, id: int, path: list[Zone], position: Zone) -> None:
         self.id = id
