@@ -1,7 +1,7 @@
 from graph import Graph
 from drone import Drone
 from zone import Zone
-from arcade.gui import UIManager, UILabel
+from math import sqrt
 import arcade
 
 COLOR = {
@@ -35,8 +35,6 @@ class Window(arcade.Window):
         self.play = False
         self.turn = self.turns[self.counter]
         self.camera = arcade.Camera2D()
-        self.manager = UIManager()
-        self.manager.enable()
         self.labels:list[arcade.Text] = []
         for hub in self.graph.hubs.values():
             x = hub.x*300
@@ -66,6 +64,28 @@ class Window(arcade.Window):
                 drone.x = self.graph.start_hub.x
                 drone.y = self.graph.start_hub.y
 
+        if self.play:
+            arrived = True
+            for mv in self.turn:
+                for drone in mv['drones']:
+                    dx = mv['to'].x - drone.x
+                    dy = mv['to'].y - drone.y
+                    distance = sqrt(dx**2+dy**2)
+
+                    if distance < 0.1:
+                        drone.x = mv['to'].x
+                        drone.y = mv['to'].y
+                    else:
+                        drone.x += (dx/distance)*delta_time*3
+                        drone.y += (dy/distance)*delta_time*3
+                        arrived = False
+
+            if arrived:
+                self.counter += 1
+                if self.counter < len(self.turns):
+                    self.turn = self.turns[self.counter] 
+
+
     def on_draw(self):
         self.clear()
         self.camera.use()
@@ -85,12 +105,12 @@ class Window(arcade.Window):
             arcade.draw_circle_filled(drone.x*300, drone.y*600, 30, COLOR['gold'])
             self.drone_nb(drone).draw()
 
-    def on_resize(self, width: float, height: float):
+    def on_resize(self, width: int, height: int):
         super().on_resize(width, height)
         self.camera.equalise()
 
 
-    def on_mouse_scroll(self, x: int, y: int, scroll_x: int, scroll_y: int):
+    def on_mouse_scroll(self, x: float, y: float, scroll_x: float, scroll_y: float):
         if scroll_y > 0:
             self.camera.zoom *= 1.1
         else:
