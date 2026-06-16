@@ -37,6 +37,7 @@ class Window(arcade.Window):
         self.restart = False
         self.turn = self.turns[self.counter]
         self.camera = arcade.Camera2D()
+        self.gui_camera = arcade.Camera2D()
         self.camera.zoom = 0.3
 
         self.labels:list[arcade.Text] = []
@@ -114,13 +115,11 @@ class Window(arcade.Window):
             for drone in self.graph.drones:
                 drone.x = self.graph.start_hub.x
                 drone.y = self.graph.start_hub.y
-            self.restart = False
 
 
     def on_draw(self):
         self.clear()
         self.camera.use()
-        arcade.Text(f"Turns: {self.counter}/{len(self.turns)}", 0, 1900, COLOR['black'], 160, bold=True).draw()
 
         for conn in self.graph.connections:
             arcade.draw_line(conn.from_zone.x*300, conn.from_zone.y*600, conn.to_zone.x*300, conn.to_zone.y*600, COLOR['black'], 6)
@@ -131,11 +130,25 @@ class Window(arcade.Window):
 
         for label in self.labels:
             label.draw()
-        
+
         for drone in self.graph.drones:
             arcade.draw_sprite(arcade.Sprite('drone.png', 0.6, drone.x*300, drone.y*600))
-            arcade.Text(str(drone.id), drone.x*300, drone.y*600, COLOR['black'], anchor_x= "center", anchor_y="center", font_size=26, bold=True).draw()
+            arcade.Text(str(drone.id), drone.x*300, drone.y*600, (0x3d, 0x66, 0x85), anchor_x= "center", anchor_y="center", font_size=26, bold=True).draw()
 
+        self.gui_camera.use()
+
+        arcade.Text(f"Turns: {self.counter}/{len(self.turns)}", 20, self.height - 20, (0x3d, 0x66, 0x85), 29, anchor_y="top", bold=True).draw()
+
+        if self.play:
+            arcade.draw_sprite(arcade.Sprite('space.png', 0.27, 90, 60))
+        else:
+            arcade.draw_sprite(arcade.Sprite('space.png', 0.3, 90, 60))
+        
+        if self.restart:
+            arcade.draw_sprite(arcade.Sprite('tab.png', 0.2, 260, 60))
+            self.restart = False
+        else:
+            arcade.draw_sprite(arcade.Sprite('tab.png', 0.23, 260, 60))
 
     def on_mouse_scroll(self, x: float, y: float, scroll_x: float, scroll_y: float):
         if scroll_y > 0:
@@ -156,7 +169,7 @@ class Window(arcade.Window):
                 self.play = False
             else:
                 self.play = True
-        elif key == arcade.key.BACKSPACE:
+        elif key == arcade.key.TAB:
             self.restart = True
 
 class Visualizer:
