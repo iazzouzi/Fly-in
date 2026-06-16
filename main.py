@@ -8,6 +8,6 @@ def main() -> None:
 
     turns = Engine.simulator(graph)
 
-    Visualizer.run(1920, 1080, graph, turns)
+    Visualizer.run(1200, 800, graph, turns)
 
 main()

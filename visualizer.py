@@ -1,6 +1,7 @@
 from graph import Graph
 from drone import Drone
 from zone import Zone
+from time import sleep
 from math import sqrt
 import arcade
 
@@ -27,26 +28,16 @@ COLOR = {
 }
 class Window(arcade.Window):
     def __init__(self, WIDTH: int, HIGHT: int, GRAPH: Graph, TURNS: list[list[dict[str, list[Drone] | Zone | int]]]):
-        super().__init__(WIDTH, HIGHT, 'Fly-in', resizable=True)
+        super().__init__(WIDTH, HIGHT, 'Fly-in')
         arcade.set_background_color(arcade.color.WHITE)
         self.graph = GRAPH
         self.turns = TURNS
         self.counter = 0
         self.play = False
-        self.r = False
+        self.restart = False
         self.turn = self.turns[self.counter]
         self.camera = arcade.Camera2D()
-        self.camera.zoom = 0.2
-
-        x = 0
-        for hub in self.graph.hubs.values():
-            if hub.x > x:
-                x = hub.x
-        self.camera.position = (x*149, 0)
-
-        for drone in self.graph.drones:
-            drone.x = self.graph.start_hub.x
-            drone.y = self.graph.start_hub.y
+        self.camera.zoom = 0.3
 
         self.labels:list[arcade.Text] = []
         for hub in self.graph.hubs.values():
@@ -57,19 +48,12 @@ class Window(arcade.Window):
             else:
                 self.labels.append(arcade.Text(hub.name, x, y, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True, rotation=13))
 
-    def turn_nb(self):
-        return arcade.Text(f"Turns: {self.counter}/{len(self.turns)}", 0, 1900, COLOR['black'], 160, bold=True)
-    
-    @staticmethod
-    def drone_nb(drone: Drone) -> arcade.Text:
-        return arcade.Text(str(drone.id), drone.x*300, drone.y*600, COLOR['black'], anchor_x= "center", anchor_y="center", font_size=26, bold=True)
-
     def on_update(self, delta_time):
-
         if self.counter == len(self.turns):
             self.play = False
             self.counter = 0
             self.turn = self.turns[self.counter]
+            sleep(1)
             for drone in self.graph.drones:
                 drone.x = self.graph.start_hub.x
                 drone.y = self.graph.start_hub.y
@@ -124,19 +108,19 @@ class Window(arcade.Window):
                 if self.counter < len(self.turns):
                     self.turn = self.turns[self.counter] 
             
-        if self.r:
+        if self.restart:
             self.counter = 0
             self.turn = self.turns[self.counter]
             for drone in self.graph.drones:
                 drone.x = self.graph.start_hub.x
                 drone.y = self.graph.start_hub.y
-            self.r = False
+            self.restart = False
 
 
     def on_draw(self):
         self.clear()
         self.camera.use()
-        self.turn_nb().draw()
+        arcade.Text(f"Turns: {self.counter}/{len(self.turns)}", 0, 1900, COLOR['black'], 160, bold=True).draw()
 
         for conn in self.graph.connections:
             arcade.draw_line(conn.from_zone.x*300, conn.from_zone.y*600, conn.to_zone.x*300, conn.to_zone.y*600, COLOR['black'], 6)
@@ -147,14 +131,10 @@ class Window(arcade.Window):
 
         for label in self.labels:
             label.draw()
-
+        
         for drone in self.graph.drones:
-            arcade.draw_circle_filled(drone.x*300, drone.y*600, 30, COLOR['gold'])
-            self.drone_nb(drone).draw()
-
-    def on_resize(self, width: int, height: int):
-        super().on_resize(width, height)
-        self.camera.equalise()
+            arcade.draw_sprite(arcade.Sprite('drone.png', 0.6, drone.x*300, drone.y*600))
+            arcade.Text(str(drone.id), drone.x*300, drone.y*600, COLOR['black'], anchor_x= "center", anchor_y="center", font_size=26, bold=True).draw()
 
 
     def on_mouse_scroll(self, x: float, y: float, scroll_x: float, scroll_y: float):
@@ -177,7 +157,7 @@ class Window(arcade.Window):
             else:
                 self.play = True
         elif key == arcade.key.BACKSPACE:
-            self.r = True
+            self.restart = True
 
 class Visualizer:
     @staticmethod
