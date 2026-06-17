@@ -3,28 +3,8 @@ from drone import Drone
 from zone import Zone
 from math import sqrt
 import arcade
+import webcolors
 
-COLOR = {
-    'red': arcade.color.RED,
-    'purple': arcade.color.PURPLE,
-    'black': arcade.color.BLACK,
-    'brown': arcade.color.BROWN,
-    'orange': arcade.color.ORANGE,
-    'maroon': arcade.color.MAROON,
-    'gold': arcade.color.GOLD,
-    'darkred': arcade.color.DARK_RED,
-    'violet': arcade.color.VIOLET,
-    'crimson': arcade.color.CRIMSON,
-    'rainbow': arcade.color.GOLD_FUSION,
-    'blue': arcade.color.BLUE_SAPPHIRE,
-    'yellow': arcade.color.GOLD,
-    'green': arcade.color.APPLE_GREEN,
-    'cyan': arcade.color.CYAN,
-    'lime': arcade.color.LIME,
-    'magenta': arcade.color.MAGENTA,
-    'gray': arcade.color.GRAY,
-    'none': arcade.color.LIGHT_GRAY,
-}
 class Window(arcade.Window):
     def __init__(self, WIDTH: int, HEIGHT: int, GRAPH: Graph, TURNS: list[list[dict[str, list[Drone] | Zone | int]]]):
         super().__init__(WIDTH, HEIGHT, 'Fly-in', resizable=True)
@@ -56,68 +36,49 @@ class Window(arcade.Window):
 
         self.labels:list[arcade.Text] = []
         for hub in self.graph.hubs.values():
+            color = webcolors.name_to_rgb(hub.color)
             x = hub.x*300
             y = hub.y*600-90
-            if hub.is_start or hub.is_end:
-                self.labels.append(arcade.Text(hub.name, x+1, y, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True))
-                self.labels.append(arcade.Text(hub.name, x-1, y, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True))
-                self.labels.append(arcade.Text(hub.name, x, y+1, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True))
-                self.labels.append(arcade.Text(hub.name, x, y-1, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True))
-                self.labels.append(arcade.Text(hub.name, x, y, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True))
+            rotation = 0 if (hub.is_start or hub.is_end) else 13
+            for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                self.labels.append(arcade.Text(hub.name, x+dx, y+dy, color, 36, anchor_x= "center", anchor_y="top", bold=True, rotation=rotation))
 
 
-            else:
-                self.labels.append(arcade.Text(hub.name, x+1, y, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True, rotation=13))
-                self.labels.append(arcade.Text(hub.name, x-1, y, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True, rotation=13))
-                self.labels.append(arcade.Text(hub.name, x, y+1, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True, rotation=13))
-                self.labels.append(arcade.Text(hub.name, x, y-1, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True, rotation=13))
-                self.labels.append(arcade.Text(hub.name, x, y, COLOR[hub.color], 36, anchor_x= "center", anchor_y="top", bold=True, rotation=13))
+        self.dronenb: list[arcade.Text] = []
+        for i in range(4):
+            self.dronenb.append(arcade.Text('', 0, 0, arcade.color.OXFORD_BLUE, 26, anchor_x= "center", anchor_y="center", bold=True))
+        self.dronenb.append(arcade.Text('', 0, 0, arcade.color.BLUE_SAPPHIRE, 26, anchor_x= "center", anchor_y="center", bold=True))
+        
 
+        self.gui_texts: list[arcade.Text] = []
 
-        self.dronenb: list[arcade.Text] = [
-            arcade.Text('', 0, 0, arcade.color.OXFORD_BLUE, 26, anchor_x= "center", anchor_y="center", bold=True),
-            arcade.Text('', 0, 0, arcade.color.OXFORD_BLUE, 26, anchor_x= "center", anchor_y="center", bold=True),
-            arcade.Text('', 0, 0, arcade.color.OXFORD_BLUE, 26, anchor_x= "center", anchor_y="center", bold=True),
-            arcade.Text('', 0, 0, arcade.color.OXFORD_BLUE, 26, anchor_x= "center", anchor_y="center", bold=True),
-            arcade.Text('', 0, 0, arcade.color.BLUE_SAPPHIRE, 26, anchor_x= "center", anchor_y="center", bold=True)
-        ]
+        for dx, dy in [(-3, 0), (+3, 0), (0, -3), (0, +3)]:
+            self.gui_texts.append(arcade.Text(f"Turns: {self.counter}/{len(self.turns)}", 20 + dx, self.height - 20 + dy, arcade.color.WHITE, 28, anchor_y="top", bold=True))
+        self.gui_texts.append(arcade.Text(f"Turns: {self.counter}/{len(self.turns)}", 20, self.height - 20, arcade.color.BLUE_SAPPHIRE, 28, anchor_y="top", bold=True))
 
-        self.gui_texts: list[arcade.Text] = [
-            arcade.Text(f"Turns: {self.counter}/{len(self.turns)}", 17, self.height - 20, arcade.color.WHITE, 28, anchor_y="top", bold=True),
-            arcade.Text(f"Turns: {self.counter}/{len(self.turns)}", 23, self.height - 20, arcade.color.WHITE, 28, anchor_y="top", bold=True),
-            arcade.Text(f"Turns: {self.counter}/{len(self.turns)}", 20, self.height - 17, arcade.color.WHITE, 28, anchor_y="top", bold=True),
-            arcade.Text(f"Turns: {self.counter}/{len(self.turns)}", 20, self.height - 23, arcade.color.WHITE, 28, anchor_y="top", bold=True),
-            arcade.Text(f"Turns: {self.counter}/{len(self.turns)}", 20, self.height - 20, arcade.color.BLUE_SAPPHIRE, 28, anchor_y="top", bold=True),
-            arcade.Text(f"Drones: {self.graph.nb_drones}", 17, self.height - 70, arcade.color.WHITE, 24, anchor_y="top", bold=True),
-            arcade.Text(f"Drones: {self.graph.nb_drones}", 23, self.height - 70, arcade.color.WHITE, 24, anchor_y="top", bold=True),
-            arcade.Text(f"Drones: {self.graph.nb_drones}", 20, self.height - 67, arcade.color.WHITE, 24, anchor_y="top", bold=True),
-            arcade.Text(f"Drones: {self.graph.nb_drones}", 20, self.height - 73, arcade.color.WHITE, 24, anchor_y="top", bold=True),
-            arcade.Text(f"Drones: {self.graph.nb_drones}", 20, self.height - 70, arcade.color.BLUE_SAPPHIRE, 24, anchor_y="top", bold=True),
-            arcade.Text(f"Zoom: x{round(self.camera.zoom, 2)}", 17, self.height - 120, arcade.color.WHITE, 20, anchor_y="top", bold=True),
-            arcade.Text(f"Zoom: x{round(self.camera.zoom, 2)}", 23, self.height - 120, arcade.color.WHITE, 20, anchor_y="top", bold=True),
-            arcade.Text(f"Zoom: x{round(self.camera.zoom, 2)}", 20, self.height - 117, arcade.color.WHITE, 20, anchor_y="top", bold=True),
-            arcade.Text(f"Zoom: x{round(self.camera.zoom, 2)}", 20, self.height - 123, arcade.color.WHITE, 20, anchor_y="top", bold=True),
-            arcade.Text(f"Zoom: x{round(self.camera.zoom, 2)}", 20, self.height - 120, arcade.color.BLUE_SAPPHIRE, 20, anchor_y="top", bold=True),
-            arcade.Text("<Pause>" if self.play else "<Start>", 26, 120, arcade.color.WHITE, 23, bold=True),
-            arcade.Text("<Pause>" if self.play else "<Start>", 20, 120, arcade.color.WHITE, 23, bold=True),
-            arcade.Text("<Pause>" if self.play else "<Start>", 23, 123, arcade.color.WHITE, 23, bold=True),
-            arcade.Text("<Pause>" if self.play else "<Start>", 23, 117, arcade.color.WHITE, 23, bold=True),
-            arcade.Text("<Pause>" if self.play else "<Start>", 23, 120, arcade.color.BLUE_SAPPHIRE, 23, bold=True),
-            arcade.Text('<Restart>', 229, 110, arcade.color.WHITE, 19, bold=True),
-            arcade.Text('<Restart>', 223, 110, arcade.color.WHITE, 19, bold=True),
-            arcade.Text('<Restart>', 226, 113, arcade.color.WHITE, 19, bold=True),
-            arcade.Text('<Restart>', 226, 107, arcade.color.WHITE, 19, bold=True),
-            arcade.Text('<Restart>', 226, 110, arcade.color.BLUE_SAPPHIRE, 19, bold=True),
-            arcade.Text('<Sound>', 423, 110, arcade.color.WHITE, 21, bold=True),
-            arcade.Text('<Sound>', 417, 110, arcade.color.WHITE, 21, bold=True),
-            arcade.Text('<Sound>', 420, 113, arcade.color.WHITE, 21, bold=True),
-            arcade.Text('<Sound>', 420, 107, arcade.color.WHITE, 21, bold=True),
-            arcade.Text('<Sound>', 420, 110, arcade.color.BLUE_SAPPHIRE, 21, bold=True),
-            arcade.Text('<Next turn>', 600, 110, arcade.color.WHITE, 17, bold=True),
-            arcade.Text('<Next turn>', 594, 110, arcade.color.WHITE, 17, bold=True),
-            arcade.Text('<Next turn>', 597, 113, arcade.color.WHITE, 17, bold=True),
-            arcade.Text('<Next turn>', 597, 107, arcade.color.WHITE, 17, bold=True),
-            arcade.Text('<Next turn>', 597, 110, arcade.color.BLUE_SAPPHIRE, 17, bold=True)]
+        for dx, dy in [(-3, 0), (+3, 0), (0, -3), (0, +3)]:
+            self.gui_texts.append(arcade.Text(f"Drones: {self.graph.nb_drones}", 20 + dx, self.height - 70 + dy, arcade.color.WHITE, 24, anchor_y="top", bold=True))
+        self.gui_texts.append(arcade.Text(f"Drones: {self.graph.nb_drones}", 20, self.height - 70, arcade.color.BLUE_SAPPHIRE, 24, anchor_y="top", bold=True))
+
+        for dx, dy in [(-3, 0), (+3, 0), (0, -3), (0, +3)]:
+            self.gui_texts.append(arcade.Text(f"Zoom: x{round(self.camera.zoom, 2)}", 20 + dx, self.height - 120 + dy, arcade.color.WHITE, 20, anchor_y="top", bold=True))
+        self.gui_texts.append(arcade.Text(f"Zoom: x{round(self.camera.zoom, 2)}", 20, self.height - 120, arcade.color.BLUE_SAPPHIRE, 20, anchor_y="top", bold=True))
+
+        for dx, dy in [(-3, 0), (+3, 0), (0, -3), (0, +3)]:
+            self.gui_texts.append(arcade.Text("<Pause>" if self.play else "<Start>", 23 + dx, 120 + dy, arcade.color.WHITE, 23, bold=True))
+        self.gui_texts.append(arcade.Text("<Pause>" if self.play else "<Start>", 23, 120, arcade.color.BLUE_SAPPHIRE, 23, bold=True))
+        
+        for dx, dy in [(-3, 0), (+3, 0), (0, -3), (0, +3)]:
+            self.gui_texts.append(arcade.Text('<Restart>', 226 + dx, 110 + dy, arcade.color.WHITE, 19, bold=True))
+        self.gui_texts.append(arcade.Text('<Restart>', 226, 110, arcade.color.BLUE_SAPPHIRE, 19, bold=True))
+
+        for dx, dy in [(-3, 0), (+3, 0), (0, -3), (0, +3)]:
+            self.gui_texts.append(arcade.Text('<Sound>', 420 + dx, 110 + dy, arcade.color.WHITE, 21, bold=True))
+        self.gui_texts.append(arcade.Text('<Sound>', 420, 110, arcade.color.BLUE_SAPPHIRE, 21, bold=True))
+        
+        for dx, dy in [(-3, 0), (+3, 0), (0, -3), (0, +3)]:
+            self.gui_texts.append(arcade.Text('<Next turn>', 597 + dx, 110 + dy, arcade.color.WHITE, 17, bold=True))
+        self.gui_texts.append(arcade.Text('<Next turn>', 597, 110, arcade.color.BLUE_SAPPHIRE, 17, bold=True))
 
     def on_update(self, delta_time):
 
@@ -233,12 +194,12 @@ class Window(arcade.Window):
 
 
         for conn in self.graph.connections:
-            arcade.draw_line(conn.from_zone.x*300, conn.from_zone.y*600, conn.to_zone.x*300, conn.to_zone.y*600, COLOR['black'], 6)
+            arcade.draw_line(conn.from_zone.x*300, conn.from_zone.y*600, conn.to_zone.x*300, conn.to_zone.y*600, arcade.color.BLACK, 6)
 
         for hub in self.graph.hubs.values():
             radius = 90
             arcade.draw_circle_filled(hub.x*300, hub.y*600, radius, arcade.color.WHITE_SMOKE)
-            arcade.draw_circle_outline(hub.x*300, hub.y*600, radius, COLOR[hub.color], 60)
+            arcade.draw_circle_outline(hub.x*300, hub.y*600, radius, webcolors.name_to_rgb(hub.color), 60)
 
         for label in self.labels:
             label.draw()
@@ -250,16 +211,11 @@ class Window(arcade.Window):
 
             for txt in self.dronenb:
                 txt.text = str(drone.id)
-                self.dronenb[0].x = (drone.x+0.029)*300
-                self.dronenb[0].y = (drone.y+0.026)*600
-                self.dronenb[1].x = (drone.x+0.023)*300
-                self.dronenb[1].y = (drone.y+0.026)*600
-                self.dronenb[2].x = (drone.x+0.026)*300
-                self.dronenb[2].y = (drone.y+0.029)*600
-                self.dronenb[3].x = (drone.x+0.026)*300
-                self.dronenb[3].y = (drone.y+0.023)*600
-                self.dronenb[4].x = (drone.x+0.026)*300
-                self.dronenb[4].y = (drone.y+0.026)*600
+                i = 0
+                for dx, dy in [(0.003, 0), (-0.003, 0), (0, 0.003), (0, -0.003), (0, 0)]:
+                    self.dronenb[i].x = (drone.x+0.026+dx)*300
+                    self.dronenb[i].y = (drone.y+0.026+dy)*600
+                    i += 1
 
             for txt in self.dronenb:
                 txt.draw()

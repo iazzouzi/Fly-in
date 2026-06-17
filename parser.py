@@ -2,6 +2,7 @@ from sys import argv
 from zone import Zone
 from graph import Graph
 from connection import Connection
+import webcolors
 
 class Parser:
     @staticmethod
@@ -84,6 +85,10 @@ class Parser:
                 if ikey == 'color':
                     if color_f:
                         raise SystemExit(f"Error: color metadata cannot be repeated in line '{line_nb}'")
+                    try:
+                        webcolors.name_to_rgb(ivalue)
+                    except ValueError:
+                        raise SystemExit(f"Error: Invalid color name '{ivalue}' in line '{line_nb}'")
                     graph.hubs[name].color = ivalue
                     color_f = True
                 if ikey == 'max_drones':
