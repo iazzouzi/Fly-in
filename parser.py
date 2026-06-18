@@ -19,6 +19,7 @@ class Parser:
         line_nb: int,
         graph: Graph,
         hub_names: set[str],
+        hub_cords: set[tuple[int, int]],
         flags: dict[str, bool],
     ) -> None:
         """Parses a single line from the input file and updates the graph
@@ -44,6 +45,8 @@ class Parser:
                 definitions, illegal characters (e.g., '-' in names), or
                 missing metadata. Prints a descriptive error to stderr.
         """
+        if not line:
+            return
         KEYS = {'start_hub', 'end_hub', 'hub', 'connection'}
         if line.startswith('#'):
             return
@@ -118,6 +121,12 @@ class Parser:
                 )
             hub_names.add(name)
             try:
+                if (int(x), int(y)) in hub_cords:
+                    raise SystemExit(
+                        f"Error: Hub coordinates ({x}, {y}) are already "
+                        f"used in line '{line_nb}'"
+                    )
+                hub_cords.add((int(x), int(y)))
                 graph.hubs[name] = Zone(name, int(x), int(y))
             except ValueError:
                 raise SystemExit(
@@ -356,12 +365,13 @@ class Parser:
         try:
             with open(file, 'r') as f:
                 graph = Graph()
-                lines = [line.strip() for line in f if line.strip()]
+                lines = [line.strip() for line in f]
                 hub_names: set[str] = set()
+                hub_cords: set[tuple[int, int]] = set()
                 flags = {'start_f': False, 'end_f': False, 'nb_drones_f': True}
                 for line_nb, line in enumerate(lines):
                     cls.line_parser(
-                        line, line_nb + 1, graph, hub_names, flags
+                        line, line_nb + 1, graph, hub_names, hub_cords, flags
                     )
             if not graph.start_hub:
                 raise SystemExit("Error: start_hub is missing.")

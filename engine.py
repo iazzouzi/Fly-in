@@ -13,7 +13,9 @@ class Engine:
 
     @staticmethod
     def next(
-        graph: Graph, drone: Drone, base: dict[str, float]
+        graph: Graph,
+        drone: Drone,
+        base: dict[str, int | float | list[list[str]]]
     ) -> Zone | None:
         """Finds the optimal next zone for a drone using Dijkstra's algorithm.
 
@@ -23,8 +25,8 @@ class Engine:
         Args:
             graph (Graph): The network graph containing zones and connections.
             drone (Drone): The drone requiring a path calculation.
-            base (dict[str, float]): Dictionary tracking base path cost for
-                consistency.
+            base (dict[str, int | float | list[list[str]]]): Dictionary
+                tracking base path cost, search flags, and path cache.
 
         Returns:
             Zone | None: The next zone the drone should move to, or None if
@@ -44,6 +46,12 @@ class Engine:
             for hub in path:
                 cost += hub.cost
             return cost
+
+        assert isinstance(base['cache'], list)
+        for path in base['cache']:
+            if (drone.position.name == path[0]
+                    and not graph.hubs[path[1]].reserved):
+                return graph.hubs[path[1]]
 
         heap: list[tuple[float, str, list[str]]] = [
             (0.0, drone.position.name, [])
@@ -66,6 +74,8 @@ class Engine:
                     drone.path + [graph.hubs[h] for h in path]
                 ) != base['base']:
                     return None
+
+                base['cache'].append([drone.position.name] + path)
                 return graph.hubs[path[0]]
 
             if hub in visited:
@@ -88,6 +98,10 @@ class Engine:
                     ),
                 )
 
+        if drone.position.is_start and drone.id == 1:
+            raise SystemExit(
+                f"No valid path found for Drone {drone.id} from start zone."
+            )
         return None
 
     @classmethod
@@ -109,8 +123,7 @@ class Engine:
                 dictionaries tracking drone transitions for the visualizer.
         """
         def get_conn_capacity(zone_a: Zone, zone_b: Zone) -> int:
-            """Retrieves the maximum capacity of a connection
-            between two zones.
+            """Retrieves the maximum connection capacity between two zones.
 
             Args:
                 zone_a (Zone): The first zone.
@@ -141,126 +154,93 @@ class Engine:
         turns: list[list[dict[str, list[Drone] | Zone | int]]] = []
         delivered = 0
         tmp: set[Drone] = set()
-        base = {'f': 1, 'base': 0.0}
+        base: dict[str, int | float | list[list[str]]] = {
+            'f': 1,
+            'base': 0.0,
+            'cache': []
+        }
 
         while delivered < graph.nb_drones:
             turns.append([])
             stmp: set[Drone] = set()
             line = ""
             i = 0
+            f = 0
 
             while i < len(drones):
-                current_drone = drones[i]
+                drone = drones[i]
 
-                if current_drone.delivered or current_drone in stmp:
+                if drone.delivered or drone in stmp:
                     i += 1
                     continue
+                if graph.nb_drones > 100:
+                    for zone in graph.adjacency[drone.position.name]:
+                        if zone is not drone.position and not zone.reserved:
+                            break
+                    else:
+                        f = 1
+                    if f:
+                        break
 
-                pos = current_drone.position
+                pos = drone.position
 
-                if current_drone in tmp:
-                    line += f"D{current_drone.id}-{pos} "
+                if drone in tmp:
+                    line += f"D{drone.id}-{pos} "
                     turns[-1].append({
-                        'drones': [current_drone],
-                        'from': current_drone.path[-2],
+                        'drones': [drone],
+                        'from': drone.path[-2],
                         'to': pos,
                         'cost2': 0,
                         'f': 1,
                     })
                     if pos.is_end:
-                        current_drone.delivered = 1
+                        drone.delivered = 1
                         delivered += 1
-                    tmp.remove(current_drone)
+                    tmp.remove(drone)
                     i += 1
                     continue
 
-                nxt = cls.next(graph, current_drone, base)
-
+                nxt = cls.next(graph, drone, base)
                 if nxt:
-                    if nxt.zone == 'restricted':
-                        line += f"D{current_drone.id}-{pos.name}-{nxt.name} "
-                        turns[-1].append({
-                            'drones': [current_drone],
-                            'from': pos,
-                            'to': nxt,
-                            'cost2': 1,
-                            'f': 0,
-                        })
-                        pos.reserved = 0
-                        pos.occupancy.remove(current_drone)
-                        current_drone.position = nxt
-                        current_drone.path.append(nxt)
-                        nxt.reserved = 1
-                        nxt.occupancy.append(current_drone)
-                        tmp.add(current_drone)
-                        stmp.add(current_drone)
-                        i += 1
-
-                    else:
-                        conn_capacity = get_conn_capacity(pos, nxt)
-                        if (
-                            len(pos.occupancy) > 1
-                            and nxt.max_drones > 1
-                            and conn_capacity > 1
-                        ):
-                            turns[-1].append({
-                                'drones': [],
-                                'from': pos,
-                                'to': nxt,
-                                'cost2': 0,
-                                'f': 0,
-                            })
-
-                            u = 0
-                            for drone in list(pos.occupancy):
-                                if u >= conn_capacity or nxt.reserved:
-                                    break
-                                if drone in stmp:
-                                    continue
-
-                                line += f"D{drone.id}-{nxt.name} "
-                                drn_list = turns[-1][-1]['drones']
-                                assert isinstance(drn_list, list)
-                                drn_list.append(drone)
-
-                                pos.reserved = 0
-                                pos.occupancy.remove(drone)
-                                drone.position = nxt
-                                drone.path.append(nxt)
-                                nxt.occupancy.append(drone)
-
-                                if nxt.is_end:
-                                    drone.delivered = 1
-                                    delivered += 1
-                                elif len(nxt.occupancy) == nxt.max_drones:
-                                    nxt.reserved = 1
-
-                                stmp.add(drone)
-                                u += 1
-                            i += 1
+                    conn_capacity = get_conn_capacity(pos, nxt)
+                    turns[-1].append({
+                        'drones': [],
+                        'from': pos,
+                        'to': nxt,
+                        'cost2': 0,
+                        'f': 0,
+                    })
+                    u = 0
+                    for drone in pos.occupancy:
+                        if u >= conn_capacity or nxt.reserved:
+                            break
+                        if drone in stmp:
+                            continue
+                        if nxt.zone == 'restricted':
+                            line += f"D{drone.id}-{pos.name}-{nxt.name} "
+                            turns[-1][-1]['cost2'] = 1
+                            nxt.reserved = 1
+                            tmp.add(drone)
                         else:
-                            line += f"D{current_drone.id}-{nxt.name} "
-                            turns[-1].append({
-                                'drones': [current_drone],
-                                'from': pos,
-                                'to': nxt,
-                                'cost2': 0,
-                                'f': 0,
-                            })
-                            pos.reserved = 0
-                            pos.occupancy.remove(current_drone)
-                            current_drone.position = nxt
-                            current_drone.path.append(nxt)
-                            nxt.occupancy.append(current_drone)
+                            line += f"D{drone.id}-{nxt.name} "
+                        drn_list = turns[-1][-1]['drones']
+                        assert isinstance(drn_list, list)
+                        drn_list.append(drone)
+                        pos.reserved = 0
+                        pos.occupancy.remove(drone)
+                        drone.position = nxt
+                        drone.path.append(nxt)
+                        nxt.occupancy.append(drone)
 
-                            if nxt.is_end:
-                                current_drone.delivered = 1
-                                delivered += 1
-                            elif len(nxt.occupancy) == nxt.max_drones:
-                                nxt.reserved = 1
+                        if nxt.is_end:
+                            drone.delivered = 1
+                            delivered += 1
+                        elif len(nxt.occupancy) == nxt.max_drones:
+                            nxt.reserved = 1
 
-                            stmp.add(current_drone)
-                            i += 1
+                        stmp.add(drone)
+                        u += 1
+                    i += 1
                 else:
                     i += 1
 
