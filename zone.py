@@ -5,35 +5,41 @@ if TYPE_CHECKING:
 
 
 class Zone:
-    """Represents a discrete zone (node) in the drone routing network.
+    """A discrete node in the drone routing network (a "hub" in map files).
+
+    Each zone has a type that governs movement cost, a capacity limit, an
+    optional display colour, and runtime state tracking which drones are
+    currently present.
 
     Attributes:
-        name (str): Unique identifier for the zone.
-        x (int): X coordinate of the zone.
-        y (int): Y coordinate of the zone.
-        zone (str): Type of zone ('normal', 'blocked', 'restricted',
-            'priority').
-        max_drones (int): Maximum number of drones that can simultaneously
-            occupy this zone.
-        color (str): Color name for visual representation.
-        is_start (bool): True if this is the starting zone.
-        is_end (bool): True if this is the destination zone.
-        cost (float): Movement cost to reach this zone (1.0 for normal,
-            2.0 for restricted, 0.2 for priority).
-        reserved (int): Boolean flag (0 or 1) indicating the zone is at
-            full capacity or locked for an incoming restricted-zone
-            transit, blocking further entries.
-        occupancy (list[Drone]): List of drones currently residing in the
-            zone.
+        name: Unique identifier used in map files and output lines.
+        x: Integer grid X coordinate as parsed from the map file.
+        y: Integer grid Y coordinate as parsed from the map file.
+        zone: Zone type string — one of ``'normal'``, ``'blocked'``,
+            ``'restricted'``, or ``'priority'``.
+        max_drones: Maximum drones allowed simultaneously; defaults to
+            ``1``.  Start and end zones are set to ``nb_drones`` so they
+            can hold the entire fleet.
+        color: CSS colour name used for rendering; ``'none'`` when unset.
+        is_start: ``True`` for the unique ``start_hub`` zone.
+        is_end: ``True`` for the unique ``end_hub`` zone.
+        cost: Pathfinding weight for entering this zone.  ``1.0`` for
+            normal/priority zones (priority uses ``0.2`` so Dijkstra
+            prefers it), ``2.0`` for restricted zones, effectively
+            infinite for blocked zones (which are never enqueued).
+        reserved: ``1`` when the zone is at capacity or locked because an
+            incoming restricted-zone transit is committed, blocking further
+            arrivals this turn; ``0`` otherwise.
+        occupancy: Live list of drones currently inside the zone.
     """
 
     def __init__(self, name: str, x: int, y: int) -> None:
-        """Initializes a new Zone instance.
+        """Creates a new Zone with default attributes.
 
         Args:
-            name (str): The unique name of the zone.
-            x (int): The X coordinate.
-            y (int): The Y coordinate.
+            name: The unique name of this zone as defined in the map file.
+            x: Integer grid X coordinate.
+            y: Integer grid Y coordinate.
         """
         self.name = name
         self.x = x
@@ -48,9 +54,9 @@ class Zone:
         self.occupancy: list['Drone'] = []
 
     def __repr__(self) -> str:
-        """Returns the string representation of the zone.
+        """Returns the zone name, used in output lines and debug output.
 
         Returns:
-            str: The name of the zone.
+            The zone's :attr:`name` string.
         """
         return self.name

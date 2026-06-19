@@ -5,10 +5,12 @@ from zone import Zone
 
 
 class Engine:
-    """Simulation engine for managing drone routing and movement.
+    """Turn-based simulation engine that routes all drones to the end hub.
 
-    This class handles the core simulation logic including pathfinding,
-    movement scheduling, and turn-based simulation of drone delivery.
+    Provides two static methods: :meth:`next` computes the optimal next
+    zone for a single drone using Dijkstra's algorithm with caching, and
+    :meth:`simulator` orchestrates the full multi-turn simulation while
+    enforcing all capacity, occupancy, and restricted-zone transit rules.
     """
 
     @staticmethod
@@ -17,34 +19,45 @@ class Engine:
         drone: Drone,
         base: dict[str, int | float | list[list[str]]]
     ) -> Zone | None:
-        """Finds the optimal next zone for a drone using Dijkstra's algorithm.
+        """Returns the best next zone for *drone*, or ``None`` if blocked.
 
-        Implements pathfinding that respects zone types and movement costs.
-        Uses a priority queue to explore the cheapest paths first.
+        Runs Dijkstra from the drone's current position to the ``end_hub``,
+        weighting edges by the destination zone's ``cost`` attribute.
+        Results are stored in a shared cache so subsequent calls for the
+        same ``(current_zone, next_zone)`` pair skip the heap entirely.
+
+        The first drone to reach the goal sets the **base cost** — a
+        reference total path cost that all subsequent drones must match.
+        This ensures drones are distributed across paths of equal length
+        rather than all converging on a single shortest route.
 
         Args:
-            graph (Graph): The network graph containing zones and connections.
-            drone (Drone): The drone requiring a path calculation.
-            base (dict[str, int | float | list[list[str]]]): Shared state
-                dictionary with three keys: 'f' (int flag, 1 on first call
-                then set to 0 after the baseline cost is recorded), 'base'
-                (float storing the reference path cost all drones must match),
-                and 'cache' (list of previously computed [from, next] name
-                pairs for fast lookup without re-running Dijkstra).
+            graph: The network graph containing zones, adjacency, and
+                connection data.
+            drone: The drone requesting a next-step decision.
+            base: Shared mutable state dictionary with three keys:
+
+                * ``'f'`` (``int``) — ``1`` until the first Dijkstra
+                  solution sets the baseline, then ``0``.
+                * ``'base'`` (``float``) — reference cumulative path cost
+                  that every drone's trajectory must equal.
+                * ``'cache'`` (``list[list[str]]``) — each entry is
+                  ``[current_zone_name, next_zone_name]``, looked up
+                  before running Dijkstra.
 
         Returns:
-            Zone | None: The next zone the drone should move to, or None if
-                no valid path exists or if the path cost differs from the
-                base cost.
+            The :class:`~zone.Zone` the drone should move into this turn,
+            or ``None`` if no valid unblocked path exists or if the only
+            available path deviates from the base cost.
         """
         def costcal(path: list[Zone]) -> float:
-            """Calculates total movement cost for a specific path.
+            """Sums the ``cost`` attribute of every zone in *path*.
 
             Args:
-                path (list[Zone]): Chronological list of zones to evaluate.
+                path: Ordered sequence of zones to evaluate.
 
             Returns:
-                float: Total accumulated cost.
+                Total accumulated movement cost as a float.
             """
             cost = 0.0
             for hub in path:
@@ -104,7 +117,8 @@ class Engine:
 
         if drone.position.is_start and drone.id == 1:
             raise SystemExit(
-                f"No valid path found for Drone {drone.id} from start zone."
+                f"No valid path found for Drone {drone.id} from "
+                f"'{drone.position.name}' to the end hub."
             )
         return None
 
@@ -112,32 +126,52 @@ class Engine:
     def simulator(
         cls, graph: Graph
     ) -> list[list[dict[str, list[Drone] | Zone | int]]]:
-        """Runs the simulation to route all drones from start to end.
+        """Runs the full simulation and returns a per-turn movement timeline.
 
-        Executes turn-by-turn simulation, scheduling drone movements while
-        respecting capacity constraints, restricted zones, and connection
-        limits. Uses two sets to coordinate movement within each turn:
-        `stmp` tracks drones already moved this turn (preventing double
-        moves), and `tmp` tracks drones mid-transit through restricted zones
-        that must complete their journey on the next turn.
+        Spawns all drones at the ``start_hub``, then iterates turn by turn
+        until every drone has been delivered to the ``end_hub``.  Within
+        each turn, drones are processed in ID order subject to:
+
+        * **Zone capacity** — a zone must have room (accounting for drones
+          leaving on the same turn) before a drone may enter.
+        * **Connection capacity** — at most ``max_link_capacity`` drones
+          may cross a given link in one turn.
+        * **Restricted-zone transit** — moving toward a ``restricted`` zone
+          costs 2 turns.  On turn 1 the drone is placed in *tmp* and the
+          connection is logged; on turn 2 the drone completes the journey.
+          A drone in *tmp* **must** move on the next turn and cannot wait.
+        * **``stmp``** — a per-turn set that prevents a drone from being
+          moved more than once in the same turn.
+        * **Large-fleet shortcut** — when ``nb_drones > 100``, any drone
+          with no free neighbour is skipped immediately to avoid O(N²)
+          stalling scans.
 
         Args:
-            graph (Graph): The fully parsed network graph.
+            graph: The fully parsed and validated network graph.
 
         Returns:
-            list[list[dict[str, list[Drone] | Zone | int]]]: A chronological
-                timeline of turns, where each turn contains movement
-                dictionaries tracking drone transitions for the visualizer.
+            A list of turns, where each turn is a list of movement dicts.
+            Each dict contains:
+
+            * ``'drones'`` — list of :class:`~drone.Drone` objects that
+              moved along this edge.
+            * ``'from'`` — source :class:`~zone.Zone`.
+            * ``'to'`` — destination :class:`~zone.Zone`.
+            * ``'cost2'`` — ``1`` if this is the first leg of a restricted
+              transit (drone stops mid-edge), ``0`` otherwise.
+            * ``'f'`` — ``1`` if this is the second leg of a restricted
+              transit (drone departs from mid-edge), ``0`` otherwise.
         """
         def get_conn_capacity(zone_a: Zone, zone_b: Zone) -> int:
-            """Retrieves the maximum connection capacity between two zones.
+            """Returns the ``max_link_capacity`` between two adjacent zones.
 
             Args:
-                zone_a (Zone): The first zone.
-                zone_b (Zone): The second zone.
+                zone_a: One endpoint of the connection.
+                zone_b: The other endpoint of the connection.
 
             Returns:
-                int: Maximum number of drones allowed on the connection.
+                The connection's capacity limit, or ``1`` if the connection
+                is not found (safe fallback).
             """
             for conn in graph.connections:
                 if (

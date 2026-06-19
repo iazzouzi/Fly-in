@@ -4,25 +4,34 @@ from connection import Connection
 
 
 class Graph:
-    """Central data structure representing the drone routing network.
+    """Central data structure representing the entire drone routing network.
+
+    Populated incrementally by :class:`~parser.Parser` and then consumed
+    by :class:`~engine.Engine`.  The adjacency list is built at the end of
+    parsing so that pathfinding can iterate neighbours without scanning
+    the full connection list each time.
 
     Attributes:
-        nb_drones (int): Total number of drones participating in the
-            simulation.
-        start_hub (Zone): The designated starting zone for all drones.
-        end_hub (Zone): The designated destination zone for all drones.
-        hubs (dict[str, Zone]): Dictionary mapping zone names to their
-            Zone objects.
-        connections (list[Connection]): Complete list of all valid
-            bidirectional connections.
-        adjacency (dict[str, list[Zone]]): Adjacency list mapping zone
-            names to their directly connected neighbor Zones.
-        drones (list[Drone]): Collection of all active Drone objects in
-            the network.
+        nb_drones: Total number of drones to be simulated, as specified by
+            the ``nb_drones`` line in the map file.
+        start_hub: The unique starting zone; set by the parser when a
+            ``start_hub`` line is encountered.
+        end_hub: The unique destination zone; set by the parser when an
+            ``end_hub`` line is encountered.
+        hubs: Mapping of zone name → :class:`~zone.Zone` for every zone
+            defined in the map file (start, end, and regular hubs).
+        connections: Ordered list of all :class:`~connection.Connection`
+            objects, preserving parse order.
+        adjacency: Adjacency list mapping each zone name to the list of
+            directly reachable neighbouring :class:`~zone.Zone` objects.
+            Built by :meth:`~parser.Parser.file_parser` after all zones
+            and connections have been parsed.
+        drones: Collection of all :class:`~drone.Drone` instances spawned
+            by the engine; populated during simulation initialisation.
     """
 
     def __init__(self) -> None:
-        """Initializes an empty graph network."""
+        """Initialises an empty graph with default/empty containers."""
         self.nb_drones: int = 0
         self.start_hub: Zone
         self.end_hub: Zone

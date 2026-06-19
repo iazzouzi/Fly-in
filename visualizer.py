@@ -3,43 +3,52 @@ from drone import Drone
 from zone import Zone
 from math import sqrt
 import arcade
-import webcolors  # # type: ignore[import-untyped]
+import webcolors  # type: ignore[import-untyped]
 from pyglet.media.player import Player
 
 
 class Window(arcade.Window):
-    """Graphical visualization window for the drone routing simulation.
+    """Arcade window that animates the drone routing simulation.
 
-    Displays the network graph with zones and connections, animates
-    drone movements, and provides interactive controls for simulation
-    playback (play, pause, restart, step-through).
+    Renders the network graph as coloured circles (zones) joined by lines
+    (connections), overlays a drone sprite that moves smoothly between
+    zone centres, and provides interactive playback controls via keyboard
+    and mouse.
 
     Attributes:
-        graph (Graph): The network graph being visualized.
-        turns (list[list[dict]]): List of simulation turns with movement data.
-        counter (int): Current turn number in the simulation.
-        play (bool): Flag indicating if simulation is playing.
-        restart (bool): Flag indicating if simulation should restart.
-        sound (arcade.Sound): Background sound asset.
-        player (Player | None): Active audio player instance.
-        play_sound (bool): Flag indicating if sound playback is enabled.
-        next (bool): Flag indicating if the simulation should step forward.
-        space1 (arcade.Sprite): Sprite for active play button.
-        space2 (arcade.Sprite): Sprite for inactive pause button.
-        r1 (arcade.Sprite): Sprite for active restart button.
-        r2 (arcade.Sprite): Sprite for inactive restart button.
-        tab1 (arcade.Sprite): Sprite for active sound toggle button.
-        tab2 (arcade.Sprite): Sprite for inactive sound toggle button.
-        right1 (arcade.Sprite): Sprite for active next turn button.
-        right2 (arcade.Sprite): Sprite for inactive next turn button.
-        drone (arcade.Sprite): Sprite object for visualizing a single drone.
-        turn (list[dict]): Movement dictionary for the current turn.
-        camera (arcade.Camera2D): Camera for panning the visualization.
-        gui_camera (arcade.Camera2D): Camera for fixed UI elements.
-        labels (list[arcade.Text]): List of text labels for each zone node.
-        dronenb (list[arcade.Text]): List of text labels displaying drone IDs.
-        gui_texts (list[arcade.Text]): List of textual UI instructions.
-        TMP (set[Drone]): Tracker for delivered drones to prevent overlapping.
+        graph: The parsed routing network, used to read zone positions,
+            colours, and the full drone list.
+        turns: Complete movement timeline produced by the engine; each
+            entry is a list of movement dicts for one simulation turn.
+        counter: Index of the turn currently being rendered (0-based).
+        play: ``True`` while the simulation is auto-advancing frame by
+            frame.
+        restart: ``True`` for one frame when the user triggers a restart;
+            resets all drone positions to the start hub.
+        sound: Loaded background music asset.
+        player: Active pyglet audio player, or ``None`` when silent.
+        play_sound: ``True`` when background music is enabled.
+        next: ``True`` for one turn when the user requests a single step
+            forward while paused.
+        space1: Play-button sprite (active/highlighted state).
+        space2: Play-button sprite (inactive state).
+        r1: Restart-button sprite (active state).
+        r2: Restart-button sprite (inactive state).
+        tab1: Sound-toggle sprite (active state).
+        tab2: Sound-toggle sprite (inactive state).
+        right1: Next-turn sprite (active state).
+        right2: Next-turn sprite (inactive state).
+        drone: Single reusable drone sprite repositioned each frame.
+        turn: Movement dict list for the turn currently in progress.
+        camera: Zoomable/pannable camera used to render the graph.
+        gui_camera: Fixed camera used to render the HUD overlay.
+        labels: Zone name text objects rendered above each node.
+        dronenb: Five stacked text objects (4 outline + 1 fill) used to
+            render each drone's ID with a drop-shadow effect.
+        gui_texts: All HUD text objects (turn counter, drone count, zoom
+            level, and button labels).
+        TMP: Set of drones that have already arrived at the end hub and
+            should be rendered only once rather than stacked.
     """
 
     def __init__(
@@ -48,16 +57,14 @@ class Window(arcade.Window):
         height: int,
         graph: Graph,
         turns: list[list[dict[str, list[Drone] | Zone | int]]],
-    ):
-        """Initializes the graphical visualization window and
-        all UI components.
+    ) -> None:
+        """Initialises the window, loads assets, and builds all UI elements.
 
         Args:
-            width (int): The width of the arcade window in pixels.
-            height (int): The height of the arcade window in pixels.
-            graph (Graph): The fully parsed data graph representing the map.
-            turns (list[list[dict]]): The sequential list of movement
-                instructions generated by the engine.
+            width: Window width in pixels.
+            height: Window height in pixels.
+            graph: The fully parsed routing network.
+            turns: The movement timeline returned by the engine.
         """
         super().__init__(width, height, 'Fly-in', resizable=True)
         arcade.set_background_color(arcade.color.OXFORD_BLUE)
@@ -305,20 +312,25 @@ class Window(arcade.Window):
         self.TMP: set[Drone] = set()
 
     def on_update(self, delta_time: float) -> None:
-        """Updates the logical state and entity positions every frame.
+        """Advances animation and simulation state each frame.
 
-        Advances the simulation by interpolating drone positions between
-        their source and destination zones to produce smooth in-flight
-        animation. For restricted zones the drone animates to the midpoint
-        on the first turn and completes the journey on the second turn
-        (cost2/f flags). Also handles turn counter advancement once all
-        drones in the current turn have arrived, simulation restart (resetting
-        all drone positions to the start hub), and continuous sound loop
-        management.
+        Interpolates drone sprites toward their target zone centres at a
+        frame-rate-independent speed.  For restricted-zone transits the
+        drone animates to the midpoint on the first turn (``cost2 = 1``)
+        and completes the journey from the midpoint on the second turn
+        (``f = 1``).  Once all drones in the current turn have reached
+        their destinations, the turn counter is incremented.
+
+        On both auto-reset (counter reaches the last turn) and manual
+        restart (R key), drone positions are returned to the start hub and
+        ``TMP`` is cleared so that arriving drones are drawn correctly on
+        replay.
+
+        Also manages looped audio playback and releases the player handle
+        whenever sound is stopped to prevent stale references.
 
         Args:
-            delta_time (float): The time in seconds elapsed since the last
-                frame update, used to scale movement speed frame-independently.
+            delta_time: Seconds elapsed since the previous frame.
         """
         if self.player and not self.play:
             arcade.stop_sound(self.player)
@@ -327,6 +339,7 @@ class Window(arcade.Window):
             self.play = False
             self.counter = 0
             self.turn = self.turns[self.counter]
+            self.TMP.clear()
             for drone in self.graph.drones:
                 drone.x = self.graph.start_hub.x
                 drone.y = self.graph.start_hub.y
@@ -393,6 +406,7 @@ class Window(arcade.Window):
             self.play = False
             self.counter = 0
             self.turn = self.turns[self.counter]
+            self.TMP.clear()
             for drone in self.graph.drones:
                 drone.x = self.graph.start_hub.x
                 drone.y = self.graph.start_hub.y
@@ -407,6 +421,7 @@ class Window(arcade.Window):
         if not self.play_sound:
             if self.player:
                 arcade.stop_sound(self.player)
+                self.player = None
 
         for i in range(5):
             self.gui_texts[i].text = f"Turns: {self.counter}/{len(self.turns)}"
@@ -434,11 +449,15 @@ class Window(arcade.Window):
             self.gui_texts[i].text = "<Pause>" if self.play else "<Start>"
 
     def on_draw(self) -> None:
-        """Renders the graphical components to the screen.
+        """Renders one frame: graph edges, zone nodes, drone sprites, and HUD.
 
-        Responsible for drawing all map elements (connections, zones,
-        labels) using the main camera, and overlaying the UI interfaces
-        (play/pause, text) using the GUI camera.
+        Drawing order (back to front):
+
+        1. Connection lines (black) using the world camera.
+        2. Zone circles with colour-coded outlines.
+        3. Zone name labels.
+        4. Drone sprite and ID labels at interpolated positions.
+        5. HUD text and button sprites using the fixed GUI camera.
         """
         self.clear()
         self.camera.use()
@@ -458,7 +477,7 @@ class Window(arcade.Window):
                 hub.color = 'white'
             radius = 90
             arcade.draw_circle_outline(
-                hub.x * 300, hub.y * 600, radius+30,
+                hub.x * 300, hub.y * 600, radius + 30,
                 arcade.color.BLUE_SAPPHIRE, 10
             )
             arcade.draw_circle_filled(
@@ -536,14 +555,17 @@ class Window(arcade.Window):
     def on_mouse_scroll(
         self, x: float, y: float, scroll_x: float, scroll_y: float
     ) -> None:
-        """Handles mouse scroll input to adjust the camera zoom level.
+        """Zooms the world camera in or out on mouse scroll.
+
+        Each scroll step multiplies or divides the zoom factor by 1.1,
+        giving smooth geometric scaling centred on the current view.
 
         Args:
-            x (float): The X position of the mouse cursor.
-            y (float): The Y position of the mouse cursor.
-            scroll_x (float): The horizontal scroll movement.
-            scroll_y (float): The vertical scroll movement (positive zooms
-                in, negative zooms out).
+            x: Mouse X position at the time of the scroll event.
+            y: Mouse Y position at the time of the scroll event.
+            scroll_x: Horizontal scroll delta (unused).
+            scroll_y: Vertical scroll delta — positive zooms in, negative
+                zooms out.
         """
         if scroll_y > 0:
             self.camera.zoom *= 1.1
@@ -559,16 +581,19 @@ class Window(arcade.Window):
         buttons: int,
         modifiers: int,
     ) -> None:
-        """Handles mouse drag input to pan the main camera view.
+        """Pans the world camera while the left mouse button is held.
+
+        The camera offset is adjusted by the drag delta divided by the
+        current zoom level so that panning speed remains constant
+        regardless of zoom.
 
         Args:
-            x (int): The current X position of the mouse.
-            y (int): The current Y position of the mouse.
-            dx (int): The change in the X axis since the last update.
-            dy (int): The change in the Y axis since the last update.
-            buttons (int): Bitwise mapping of currently pressed mouse buttons.
-            modifiers (int): Bitwise mapping of currently pressed modifier
-                keys (Shift, Ctrl).
+            x: Current mouse X position.
+            y: Current mouse Y position.
+            dx: Pixel change in X since the last drag event.
+            dy: Pixel change in Y since the last drag event.
+            buttons: Bitmask of currently pressed mouse buttons.
+            modifiers: Bitmask of currently held modifier keys.
         """
         if buttons & arcade.MOUSE_BUTTON_LEFT:
             pos = self.camera.position
@@ -578,20 +603,19 @@ class Window(arcade.Window):
             )
 
     def on_key_press(self, key: int, modifiers: int) -> None:
-        """Handles keyboard input to control simulation playback and audio.
+        """Handles keyboard shortcuts for simulation playback control.
 
         Key bindings:
-            SPACE: Toggle play/pause. Starts or stops drone animation and
-                syncs audio playback with the current sound toggle state.
-            R: Restart the simulation from the beginning, stopping any
-                active audio.
-            TAB: Toggle background sound on or off.
-            RIGHT: Advance one simulation turn manually while paused.
+
+        * **SPACE** — toggle play / pause.  Starts or stops audio in sync
+          with the current sound-toggle state.
+        * **R** — restart the simulation from turn 0, stopping any audio.
+        * **TAB** — toggle background music on or off.
+        * **RIGHT arrow** — advance exactly one turn while paused.
 
         Args:
-            key (int): The arcade constant representing the key pressed.
-            modifiers (int): Bitwise mapping of currently held modifier
-                keys (e.g., Shift, Ctrl).
+            key: Arcade key constant for the pressed key.
+            modifiers: Bitmask of currently held modifier keys.
         """
         if key == arcade.key.SPACE:
             if self.play:
@@ -621,10 +645,11 @@ class Window(arcade.Window):
 
 
 class Visualizer:
-    """Wrapper class for initializing and running the visualization.
+    """Thin wrapper that constructs the Window and starts the arcade event loop.
 
-    This class provides the static entry point for starting the
-    graphical simulation display using the arcade library.
+    Keeping this class separate from Window allows the simulation pipeline
+    (parse → simulate → visualise) to remain decoupled: the engine never
+    imports arcade, and tests can skip visualisation entirely.
     """
 
     @staticmethod
@@ -634,14 +659,15 @@ class Visualizer:
         graph: Graph,
         turns: list[list[dict[str, list[Drone] | Zone | int]]],
     ) -> None:
-        """Instantiates the Window and starts the main Arcade event loop.
+        """Creates the Window and enters the arcade event loop.
+
+        This call blocks until the user closes the window.
 
         Args:
-            width (int): The width of the window in pixels.
-            height (int): The height of the window in pixels.
-            graph (Graph): The parsed network graph.
-            turns (list[list[dict]]): The timeline of computed turn
-                movements.
+            width: Desired window width in pixels.
+            height: Desired window height in pixels.
+            graph: The parsed routing network.
+            turns: The movement timeline returned by :meth:`~engine.Engine.simulator`.
         """
         Window(width, height, graph, turns)
         arcade.run()

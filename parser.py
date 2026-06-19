@@ -2,15 +2,14 @@ from sys import argv
 from zone import Zone
 from graph import Graph
 from connection import Connection
-import webcolors  # # type: ignore[import-untyped]
+import webcolors  # type: ignore[import-untyped]
 
 
 class Parser:
-    """Parses input files and builds the drone routing network graph.
+    """Parses input map files and builds the drone routing network graph.
 
-    This class handles reading and validating the input file format,
-    extracting zone definitions, connections, and metadata, then
-    constructing the network graph used by the simulation engine.
+    Reads and validates the custom text format describing zones, connections,
+    and simulation parameters, then constructs the Graph used by the Engine.
     """
 
     @staticmethod
@@ -22,31 +21,30 @@ class Parser:
         hub_cords: set[tuple[int, int]],
         flags: dict[str, bool],
     ) -> None:
-        """Parses a single line from the input file and updates the graph
-        structure.
+        """Parses one line from the input file and updates the graph in place.
 
-        Processes syntax for metadata configurations including 'nb_drones',
-        'start_hub', 'end_hub', 'hub', and 'connection'. Validates all
-        syntax according to the subject rules.
+        Handles the five recognised prefixes: ``nb_drones``, ``start_hub``,
+        ``end_hub``, ``hub``, and ``connection``. Blank lines and comments
+        (``#``) are silently skipped.  Inline comments are stripped before
+        processing.
 
         Args:
-            line (str): The raw string line extracted from the input text
-                file.
-            line_nb (int): The current line number, used for verbose error
-                reporting.
-            graph (Graph): The active graph structure being populated.
-            hub_names (set[str]): An accumulated set of previously defined
-                hub names to prevent duplicate name definitions.
-            hub_cords (set[tuple[int, int]]): An accumulated set of
-                previously used (x, y) coordinate pairs to prevent
-                duplicate zone positions.
-            flags (dict[str, bool]): State dictionary tracking parsing
-                progression (e.g., 'start_f', 'end_f', 'nb_drones_f').
+            line: Raw text line read from the input file.
+            line_nb: 1-based line number used in error messages.
+            graph: Mutable graph being populated during parsing.
+            hub_names: Accumulated set of zone names already defined,
+                used to detect duplicates.
+            hub_cords: Accumulated set of ``(x, y)`` coordinate pairs
+                already used, used to detect duplicate positions.
+            flags: Parsing-state dictionary with three boolean keys:
+                ``'nb_drones_f'`` (True until the first line is consumed),
+                ``'start_f'`` (True once a ``start_hub`` has been parsed),
+                and ``'end_f'`` (True once an ``end_hub`` has been parsed).
 
         Raises:
-            SystemExit: If the line contains invalid syntax, duplicate
-                definitions, illegal characters (e.g., '-' in names), or
-                missing metadata. Prints a descriptive error to stderr.
+            SystemExit: On any syntax violation, duplicate definition,
+                capacity error, or unknown key/value.  The message always
+                includes the line number and a description of the cause.
         """
         if not line:
             return
@@ -54,87 +52,92 @@ class Parser:
         if line.startswith('#'):
             return
         if '#' in line:
-            line = line.split('#', 1)[0]
+            line = line.split('#', 1)[0].strip()
         if line.count(':') != 1:
             raise SystemExit(
-                f"Error: Invalid line format, there must be exactly one "
-                f"':' in the line '{line_nb}'"
+                f"Error on line {line_nb}: expected exactly one ':' "
+                f"separator, got {line.count(':')}."
             )
         key, value = line.split(':')
         key = key.strip()
         value = value.strip()
         if not key:
             raise SystemExit(
-                f"Error: Key cannot be empty in line '{line_nb}'"
+                f"Error on line {line_nb}: key before ':' cannot be empty."
             )
         if not value:
             raise SystemExit(
-                f"Error: Value cannot be empty in line '{line_nb}'"
+                f"Error on line {line_nb}: value after ':' cannot be empty."
             )
         if flags['nb_drones_f']:
             if key != 'nb_drones':
                 raise SystemExit(
-                    f"Error: First line must be nb_drones in line "
-                    f"'{line_nb}'"
+                    f"Error on line {line_nb}: first non-comment line must "
+                    f"be 'nb_drones: <positive_integer>', got '{key}'."
                 )
             try:
-                if int(value) <= 0:
+                nb = int(value)
+                if nb <= 0:
                     raise SystemExit(
-                        f"Error: nb_drones must be a positive integer in "
-                        f"line '{line_nb}'"
+                        f"Error on line {line_nb}: 'nb_drones' must be a "
+                        f"positive integer, got {value!r}."
                     )
-                graph.nb_drones = int(value)
+                graph.nb_drones = nb
             except ValueError:
                 raise SystemExit(
-                    f"Error: nb_drones must be an integer in line "
-                    f"'{line_nb}'"
+                    f"Error on line {line_nb}: 'nb_drones' must be an "
+                    f"integer, got {value!r}."
                 )
             flags['nb_drones_f'] = False
             return
         if key not in KEYS:
             raise SystemExit(
-                f"Error: Invalid key '{key}' in line '{line_nb}'"
+                f"Error on line {line_nb}: unknown key '{key}'; "
+                f"expected one of: start_hub, end_hub, hub, connection."
             )
         if key in {'start_hub', 'end_hub', 'hub'}:
             if key == 'start_hub' and flags['start_f']:
                 raise SystemExit(
-                    f"Error: start_hub cannot be repeated in line "
-                    f"'{line_nb}'"
+                    f"Error on line {line_nb}: 'start_hub' is already "
+                    f"defined — only one start zone is allowed."
                 )
             if key == 'end_hub' and flags['end_f']:
                 raise SystemExit(
-                    f"Error: end_hub cannot be repeated in line "
-                    f"'{line_nb}'"
+                    f"Error on line {line_nb}: 'end_hub' is already "
+                    f"defined — only one end zone is allowed."
                 )
             try:
                 name, x, y, *metadata = value.split()
             except ValueError:
                 raise SystemExit(
-                    f"Error: Invalid hub format in line '{line_nb}'"
+                    f"Error on line {line_nb}: invalid hub format; "
+                    f"expected '<name> <x> <y> [metadata]'."
                 )
             if '-' in name:
                 raise SystemExit(
-                    f"Error: Hub name cannot contain '-' in line "
-                    f"'{line_nb}'"
+                    f"Error on line {line_nb}: zone name '{name}' contains "
+                    f"'-', which is forbidden (reserved as connection "
+                    f"separator)."
                 )
             if name in hub_names:
                 raise SystemExit(
-                    f"Error: Hub name '{name}' is already used in line "
-                    f"'{line_nb}'"
+                    f"Error on line {line_nb}: zone name '{name}' is "
+                    f"already defined."
                 )
             hub_names.add(name)
             try:
-                if (int(x), int(y)) in hub_cords:
+                ix, iy = int(x), int(y)
+                if (ix, iy) in hub_cords:
                     raise SystemExit(
-                        f"Error: Hub coordinates ({x}, {y}) are already "
-                        f"used in line '{line_nb}'"
+                        f"Error on line {line_nb}: coordinates ({x}, {y}) "
+                        f"are already occupied by another zone."
                     )
-                hub_cords.add((int(x), int(y)))
-                graph.hubs[name] = Zone(name, int(x), int(y))
+                hub_cords.add((ix, iy))
+                graph.hubs[name] = Zone(name, ix, iy)
             except ValueError:
                 raise SystemExit(
-                    f"Error: Hub coordinates must be integers in line "
-                    f"'{line_nb}'"
+                    f"Error on line {line_nb}: zone coordinates must be "
+                    f"integers, got '{x}' and '{y}'."
                 )
             if key == 'start_hub':
                 graph.hubs[name].is_start = True
@@ -154,19 +157,18 @@ class Parser:
                         tmp.append(ch)
             if tmp[0] != '[' or tmp[1] != ']' or len(tmp) != 2:
                 raise SystemExit(
-                    f"Error: Metadata must be enclosed in [] and must "
-                    f"contain exactly one opening and "
-                    f"one closing bracket in line {line_nb}"
+                    f"Error on line {line_nb}: metadata must be enclosed "
+                    f"in exactly one pair of brackets '[...]'."
                 )
             if not metadata[0].startswith('['):
                 raise SystemExit(
-                    f"Error: Metadata must be enclosed in [] in line "
-                    f"'{line_nb}'"
+                    f"Error on line {line_nb}: metadata block must open "
+                    f"with '['."
                 )
             if not metadata[-1].endswith(']'):
                 raise SystemExit(
-                    f"Error: Metadata must be enclosed in [] in line "
-                    f"'{line_nb}'"
+                    f"Error on line {line_nb}: metadata block must close "
+                    f"with ']'."
                 )
             if metadata[0] == '[':
                 metadata.pop(0)
@@ -184,81 +186,77 @@ class Parser:
             for item in metadata:
                 if item.count('=') != 1:
                     raise SystemExit(
-                        f"Error: Invalid metadata format in line "
-                        f"'{line_nb}'"
+                        f"Error on line {line_nb}: each metadata entry must "
+                        f"have exactly one '=', got '{item}'."
                     )
                 ikey, ivalue = item.split('=')
                 ikey = ikey.strip()
                 ivalue = ivalue.strip()
                 if not ikey:
                     raise SystemExit(
-                        f"Error: Metadata key cannot be empty in line "
-                        f"'{line_nb}'"
+                        f"Error on line {line_nb}: metadata key cannot be "
+                        f"empty in '{item}'."
                     )
                 if not ivalue:
                     raise SystemExit(
-                        f"Error: Metadata value cannot be empty in line "
-                        f"'{line_nb}'"
+                        f"Error on line {line_nb}: metadata value cannot be "
+                        f"empty in '{item}'."
                     )
                 if ikey not in metadata_keys:
                     raise SystemExit(
-                        f"Error: Invalid metadata key '{ikey}' in line "
-                        f"'{line_nb}'"
+                        f"Error on line {line_nb}: unknown metadata key "
+                        f"'{ikey}'; valid keys are: zone, color, max_drones."
                     )
                 if ikey == 'color':
                     if color_f:
                         raise SystemExit(
-                            f"Error: color metadata cannot be repeated in "
-                            f"line '{line_nb}'"
+                            f"Error on line {line_nb}: 'color' metadata key "
+                            f"cannot appear more than once."
                         )
                     try:
                         webcolors.name_to_rgb(ivalue)
                     except ValueError:
                         raise SystemExit(
-                            f"Error: Invalid color name '{ivalue}' in line "
-                            f"'{line_nb}'"
+                            f"Error on line {line_nb}: '{ivalue}' is not a "
+                            f"recognised CSS color name."
                         )
                     graph.hubs[name].color = ivalue
                     color_f = True
                 if ikey == 'max_drones':
                     if max_drones_f:
                         raise SystemExit(
-                            f"Error: max_drones metadata cannot be repeated "
-                            f"in line '{line_nb}'"
+                            f"Error on line {line_nb}: 'max_drones' metadata "
+                            f"key cannot appear more than once."
+                        )
+                    try:
+                        md_val = int(ivalue)
+                        if md_val <= 0:
+                            raise SystemExit(
+                                f"Error on line {line_nb}: 'max_drones' must "
+                                f"be a positive integer, got {ivalue!r}."
+                            )
+                    except ValueError:
+                        raise SystemExit(
+                            f"Error on line {line_nb}: 'max_drones' must be "
+                            f"an integer, got {ivalue!r}."
                         )
                     if key in {'start_hub', 'end_hub'}:
                         graph.hubs[name].max_drones = graph.nb_drones
-                        max_drones_f = True
                     else:
-                        try:
-                            if int(ivalue) <= 0:
-                                raise SystemExit(
-                                    f"Error: max_drones must be a positive "
-                                    f"integer greater than 0 "
-                                    f"in line '{line_nb}'"
-                                )
-                            graph.hubs[name].max_drones = int(ivalue)
-                            max_drones_f = True
-                        except ValueError:
-                            raise SystemExit(
-                                f"Error: max_drones must be "
-                                f"an integer in line {line_nb}"
-                            )
+                        graph.hubs[name].max_drones = md_val
+                    max_drones_f = True
                 if ikey == 'zone':
                     if zone_f:
                         raise SystemExit(
-                            f"Error: zone metadata cannot be repeated in "
-                            f"line '{line_nb}'"
+                            f"Error on line {line_nb}: 'zone' metadata key "
+                            f"cannot appear more than once."
                         )
-                    if ivalue not in {
-                        'normal',
-                        'blocked',
-                        'restricted',
-                        'priority',
-                    }:
+                    valid_types = {'normal', 'blocked', 'restricted', 'priority'}
+                    if ivalue not in valid_types:
                         raise SystemExit(
-                            f"Error: Invalid zone value in line "
-                            f"'{line_nb}'"
+                            f"Error on line {line_nb}: invalid zone type "
+                            f"'{ivalue}'; must be one of: "
+                            f"normal, blocked, restricted, priority."
                         )
                     graph.hubs[name].zone = ivalue
                     if ivalue == 'restricted':
@@ -270,49 +268,41 @@ class Parser:
             connection, *metadata = value.split()
             if connection.count('-') != 1:
                 raise SystemExit(
-                    f"Error: Invalid connection format there must be "
-                    f"exactly one '-' in the connection in line "
-                    f"'{line_nb}'"
+                    f"Error on line {line_nb}: connection must use exactly "
+                    f"one '-' separator, e.g. 'zone1-zone2', "
+                    f"got '{connection}'."
                 )
-            if not connection.split('-')[0] or not connection.split(
-                '-'
-            )[1]:
+            parts = connection.split('-')
+            if not parts[0] or not parts[1]:
                 raise SystemExit(
-                    f"Error: Connection must have a from and to hub in "
-                    f"line '{line_nb}'"
+                    f"Error on line {line_nb}: both sides of the connection "
+                    f"must be non-empty zone names."
                 )
-            if connection.split('-')[0] == connection.split('-')[1]:
+            if parts[0] == parts[1]:
                 raise SystemExit(
-                    f"Error: Connection cannot be between the same hub in "
-                    f"line '{line_nb}'"
+                    f"Error on line {line_nb}: a connection cannot link "
+                    f"a zone to itself ('{parts[0]}')."
                 )
-            from_hub, to_hub = connection.split('-')
+            from_hub, to_hub = parts[0], parts[1]
             for conn in graph.connections:
-                if {
-                    conn.from_zone.name,
-                    conn.to_zone.name,
-                } == {
-                    from_hub,
-                    to_hub,
-                } or {
-                    conn.from_zone.name,
-                    conn.to_zone.name,
-                } == {to_hub, from_hub}:
+                if {conn.from_zone.name, conn.to_zone.name} == {
+                    from_hub, to_hub
+                }:
                     raise SystemExit(
-                        f"Error: Connection '{from_hub}-{to_hub}' is "
-                        f"duplicated in line '{line_nb}'"
+                        f"Error on line {line_nb}: connection "
+                        f"'{from_hub}-{to_hub}' is already defined "
+                        f"(duplicate connections are forbidden)."
                     )
-            if (
-                connection.split('-')[0] in hub_names
-                and connection.split('-')[1] in hub_names
-            ):
-                from_shub = graph.hubs[connection.split('-')[0]]
-                to_shub = graph.hubs[connection.split('-')[1]]
+            if from_hub in hub_names and to_hub in hub_names:
+                from_shub = graph.hubs[from_hub]
+                to_shub = graph.hubs[to_hub]
             else:
+                unknown = from_hub if from_hub not in hub_names else to_hub
                 raise SystemExit(
-                    "Error: Connection hubs must be defined in the "
-                    f"hubs section in line '{line_nb}'"
+                    f"Error on line {line_nb}: zone '{unknown}' used in "
+                    f"connection is not defined."
                 )
+            capacity = 1
             if metadata:
                 tmp = []
                 for word in metadata:
@@ -321,19 +311,19 @@ class Parser:
                             tmp.append(ch)
                 if tmp[0] != '[' or tmp[1] != ']' or len(tmp) != 2:
                     raise SystemExit(
-                        f"Error: Metadata must be enclosed in [] and must "
-                        f"contain exactly one opening and "
-                        f"one closing bracket in line {line_nb}"
+                        f"Error on line {line_nb}: connection metadata must "
+                        f"be enclosed in exactly one pair of brackets "
+                        f"'[...]'."
                     )
                 if not metadata[0].startswith('['):
                     raise SystemExit(
-                        f"Error: Metadata must be enclosed in [] in line "
-                        f"'{line_nb}'"
+                        f"Error on line {line_nb}: connection metadata block "
+                        f"must open with '['."
                     )
                 if not metadata[-1].endswith(']'):
                     raise SystemExit(
-                        f"Error: Metadata must be enclosed in [] in line "
-                        f"'{line_nb}'"
+                        f"Error on line {line_nb}: connection metadata block "
+                        f"must close with ']'."
                     )
                 if metadata[0] == '[':
                     metadata.pop(0)
@@ -346,88 +336,100 @@ class Parser:
                 if metadata:
                     if len(metadata) != 1:
                         raise SystemExit(
-                            f"Error: Invalid metadata format must contain "
-                            f"exactly one metadata item in line '{line_nb}'"
+                            f"Error on line {line_nb}: connection metadata "
+                            f"must contain exactly one entry "
+                            f"(max_link_capacity=<n>)."
                         )
                     if metadata[0].count('=') != 1:
                         raise SystemExit(
-                            f"Error: Invalid metadata format must"
-                            f"contain exactly one '=' in line {line_nb}"
+                            f"Error on line {line_nb}: connection metadata "
+                            f"entry must contain exactly one '=', "
+                            f"got '{metadata[0]}'."
                         )
-                    if metadata[0].split('=')[0] != 'max_link_capacity':
+                    mkey, mval = metadata[0].split('=')
+                    if mkey != 'max_link_capacity':
                         raise SystemExit(
-                            f"Error: Invalid key in metadata, "
-                            f"expected 'max_link_capacity' in line {line_nb}"
+                            f"Error on line {line_nb}: unknown connection "
+                            f"metadata key '{mkey}'; expected "
+                            f"'max_link_capacity'."
                         )
                     try:
-                        max_val = int(metadata[0].split('=')[1])
+                        max_val = int(mval)
                         if max_val <= 0:
                             raise SystemExit(
-                                f"Error: max_link_capacity must be a positive "
-                                f"integer in line '{line_nb}'"
+                                f"Error on line {line_nb}: "
+                                f"'max_link_capacity' must be a positive "
+                                f"integer, got {mval!r}."
                             )
                         capacity = max_val
                     except ValueError:
                         raise SystemExit(
-                            f"Error: max_link_capacity must be an "
-                            f"integer greater than 0 in line {line_nb}"
+                            f"Error on line {line_nb}: "
+                            f"'max_link_capacity' must be an integer, "
+                            f"got {mval!r}."
                         )
-            else:
-                capacity = 1
             graph.connections.append(Connection(from_shub, to_shub, capacity))
 
     @classmethod
     def file_parser(cls) -> Graph:
-        """Opens, reads, and parses the complete input file into a valid Graph.
+        """Opens, reads, and parses the complete input file into a Graph.
 
-        Reads the file path provided via command line arguments (`sys.argv`),
-        processes each line through `line_parser`, and finally validates
-        the integrity of the overall graph (ensuring start and end hubs
-        exist) while building the adjacency list.
+        Reads the file path from ``sys.argv[1]`` (or prompts when omitted),
+        delegates each line to :meth:`line_parser`, validates the final
+        graph integrity, and builds the adjacency list.
 
         Returns:
-            Graph: A fully constructed, validated, and linked representation
-                of the map.
+            A fully constructed, validated Graph ready for the Engine.
 
         Raises:
-            SystemExit: If no file argument is provided, if the file is not
-                a `.txt`, if the file cannot be found/read, or if the
-                graph lacks start/end hubs.
+            SystemExit: If too many CLI arguments are provided, the file
+                extension is not ``.txt``, the file cannot be opened, or
+                the parsed graph is missing a ``start_hub`` or ``end_hub``.
         """
         if len(argv) > 2:
-            raise SystemExit("Error: Too many arguments.")
+            raise SystemExit("Error: too many arguments — expected at most "
+                             "one file path.")
         if len(argv) == 1:
             file = input("Enter the file path: ")
         else:
             file = argv[1]
         if not file:
-            raise SystemExit("Error: No file provided.")
+            raise SystemExit("Error: no file path provided.")
         if not file.endswith('txt'):
-            raise SystemExit("Error: File must be a .txt file.")
+            raise SystemExit(
+                f"Error: '{file}' is not a .txt file."
+            )
         try:
             with open(file, 'r') as f:
                 graph = Graph()
                 lines = [line.strip() for line in f]
                 hub_names: set[str] = set()
                 hub_cords: set[tuple[int, int]] = set()
-                flags = {'start_f': False, 'end_f': False, 'nb_drones_f': True}
+                flags = {
+                    'start_f': False,
+                    'end_f': False,
+                    'nb_drones_f': True,
+                }
                 for line_nb, line in enumerate(lines):
                     cls.line_parser(
                         line, line_nb + 1, graph, hub_names, hub_cords, flags
                     )
             if not graph.start_hub:
-                raise SystemExit("Error: start_hub is missing.")
+                raise SystemExit(
+                    "Error: no 'start_hub' found — the map must define "
+                    "exactly one starting zone."
+                )
             if not graph.end_hub:
-                raise SystemExit("Error: end_hub is missing.")
+                raise SystemExit(
+                    "Error: no 'end_hub' found — the map must define "
+                    "exactly one destination zone."
+                )
             for hub in graph.hubs.values():
                 if hub.name not in graph.adjacency:
                     graph.adjacency[hub.name] = []
                 for connection in graph.connections:
                     if hub is connection.from_zone:
-                        if (
-                            connection.to_zone
-                            not in graph.adjacency[hub.name]
-                        ):
+                        if connection.to_zone not in graph.adjacency[hub.name]:
                             graph.adjacency[hub.name].append(
                                 connection.to_zone
                             )
@@ -440,8 +442,7 @@ class Parser:
                                 connection.from_zone
                             )
             return graph
-
         except OSError as e:
             raise SystemExit(
-                f"Error: Could not read file '{file}' - {e.strerror}"
+                f"Error: could not read '{file}' — {e.strerror}."
             )

@@ -4,12 +4,17 @@ from visualizer import Visualizer
 
 
 def main() -> None:
-    """Main entry point for the drone routing simulation.
+    """Entry point for the Fly-in drone routing simulation.
 
-    Workflow:
-        1. Parses the input file to build the network graph.
-        2. Runs the simulation engine to calculate drone movements.
-        3. Visualizes the results in a graphical arcade interface.
+    Executes the three-stage pipeline:
+
+    1. **Parse** — reads and validates the map file (path from ``argv[1]``
+       or interactive prompt), producing a fully linked :class:`~graph.Graph`.
+    2. **Simulate** — runs the turn-based engine, printing each turn's
+       drone movements to stdout in the required ``D<id>-<zone>`` format
+       and returning the movement timeline.
+    3. **Visualise** — opens the arcade window to replay the computed
+       simulation with interactive playback controls.
     """
     graph = Parser.file_parser()
     turns = Engine.simulator(graph)

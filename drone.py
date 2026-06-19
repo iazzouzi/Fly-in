@@ -2,40 +2,48 @@ from zone import Zone
 
 
 class Drone:
-    """Represents a single autonomous drone within the simulation.
+    """A single autonomous drone participating in the simulation.
+
+    The ``x`` and ``y`` attributes are floating-point screen coordinates
+    used by the visualizer for smooth interpolation; they are distinct from
+    the integer grid coordinates stored on :class:`~zone.Zone`.
 
     Attributes:
-        id (int): Unique numeric identifier for the drone.
-        x (float): Current X coordinate position in the visualization.
-        y (float): Current Y coordinate position in the visualization.
-        path (list[Zone]): Chronological history of zones the drone has
-            visited, appended to incrementally as the drone moves.
-            Starts empty and is used by the engine to calculate
-            cumulative path cost.
-        position (Zone): The current zone the drone is occupying.
-        delivered (int): Status flag indicating if the drone has reached
-            the end hub.
+        id: Unique 1-based numeric identifier assigned at spawn time.
+        x: Visualizer X position, interpolated continuously between zone
+            centres during animation.
+        y: Visualizer Y position, interpolated continuously between zone
+            centres during animation.
+        path: Ordered list of every :class:`~zone.Zone` the drone has
+            occupied, starting from the ``start_hub``.  Appended to by the
+            engine each time the drone enters a new zone and used to
+            calculate cumulative path cost.
+        position: The zone the drone currently occupies in the simulation
+            state (may differ from the visual position mid-animation).
+        delivered: ``1`` once the drone has reached the ``end_hub``,
+            ``0`` otherwise.  Used by the engine to count remaining drones.
     """
 
     def __init__(self, id: int, path: list[Zone], position: Zone) -> None:
-        """Initializes a new Drone instance.
+        """Spawns a new Drone at the given position.
 
         Args:
-            id (int): Unique identifier for the drone.
-            path (list[Zone]): Initial assigned path for the drone.
-            position (Zone): The starting zone for the drone.
+            id: Unique numeric identifier for this drone.
+            path: Initial path list, typically ``[]`` on creation; the
+                engine appends the starting zone immediately after spawning.
+            position: The zone where the drone begins the simulation.
         """
         self.id = id
-        self.x = 0.0
-        self.y = 0.0
+        self.x: float = 0.0
+        self.y: float = 0.0
         self.path = path
         self.position = position
         self.delivered: int = 0
 
     def __repr__(self) -> str:
-        """Returns the string representation of the drone.
+        """Returns the drone's numeric ID as a string.
 
         Returns:
-            str: The unique ID of the drone.
+            The string form of :attr:`id`, e.g. ``'3'``.
         """
         return f"{self.id}"
