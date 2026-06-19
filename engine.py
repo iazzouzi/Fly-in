@@ -219,7 +219,7 @@ class Engine:
                         'f': 0,
                     })
                     u = 0
-                    for drone in pos.occupancy:
+                    for drone in list(pos.occupancy):
                         if u >= conn_capacity or nxt.reserved:
                             break
                         if drone in stmp:

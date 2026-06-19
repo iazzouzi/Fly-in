@@ -155,19 +155,19 @@ class Parser:
             if tmp[0] != '[' or tmp[1] != ']' or len(tmp) != 2:
                 raise SystemExit(
                     f"Error: Metadata must be enclosed in [] and must "
-                    f"contain exactly one opening and one closing bracket in line "
-                    f"'{line_nb}'"
+                    f"contain exactly one opening and "
+                    f"one closing bracket in line {line_nb}"
                 )
             if not metadata[0].startswith('['):
-                    raise SystemExit(
-                        f"Error: Metadata must be enclosed in [] in line "
-                        f"'{line_nb}'"
-                    )
+                raise SystemExit(
+                    f"Error: Metadata must be enclosed in [] in line "
+                    f"'{line_nb}'"
+                )
             if not metadata[-1].endswith(']'):
-                    raise SystemExit(
-                        f"Error: Metadata must be enclosed in [] in line "
-                        f"'{line_nb}'"
-                    )
+                raise SystemExit(
+                    f"Error: Metadata must be enclosed in [] in line "
+                    f"'{line_nb}'"
+                )
             if metadata[0] == '[':
                 metadata.pop(0)
             elif metadata[0].startswith('['):
@@ -234,14 +234,15 @@ class Parser:
                             if int(ivalue) <= 0:
                                 raise SystemExit(
                                     f"Error: max_drones must be a positive "
-                                    f"integer greater than 0 in line '{line_nb}'"
+                                    f"integer greater than 0 "
+                                    f"in line '{line_nb}'"
                                 )
                             graph.hubs[name].max_drones = int(ivalue)
                             max_drones_f = True
                         except ValueError:
                             raise SystemExit(
-                                f"Error: max_drones must be an integer in line "
-                                f"'{line_nb}'"
+                                f"Error: max_drones must be "
+                                f"an integer in line {line_nb}"
                             )
                 if ikey == 'zone':
                     if zone_f:
@@ -321,19 +322,19 @@ class Parser:
                 if tmp[0] != '[' or tmp[1] != ']' or len(tmp) != 2:
                     raise SystemExit(
                         f"Error: Metadata must be enclosed in [] and must "
-                        f"contain exactly one opening and one closing bracket in line "
-                        f"'{line_nb}'"
+                        f"contain exactly one opening and "
+                        f"one closing bracket in line {line_nb}"
                     )
                 if not metadata[0].startswith('['):
-                        raise SystemExit(
-                            f"Error: Metadata must be enclosed in [] in line "
-                            f"'{line_nb}'"
-                        )
+                    raise SystemExit(
+                        f"Error: Metadata must be enclosed in [] in line "
+                        f"'{line_nb}'"
+                    )
                 if not metadata[-1].endswith(']'):
-                        raise SystemExit(
-                            f"Error: Metadata must be enclosed in [] in line "
-                            f"'{line_nb}'"
-                        )
+                    raise SystemExit(
+                        f"Error: Metadata must be enclosed in [] in line "
+                        f"'{line_nb}'"
+                    )
                 if metadata[0] == '[':
                     metadata.pop(0)
                 elif metadata[0].startswith('['):
@@ -350,13 +351,13 @@ class Parser:
                         )
                     if metadata[0].count('=') != 1:
                         raise SystemExit(
-                            f"Error: Invalid metadata format must contain exactly one '=' in "
-                            f"line '{line_nb}'"
+                            f"Error: Invalid metadata format must"
+                            f"contain exactly one '=' in line {line_nb}"
                         )
                     if metadata[0].split('=')[0] != 'max_link_capacity':
                         raise SystemExit(
-                            f"Error: Invalid key in metadata, expected 'max_link_capacity' in "
-                            f"line '{line_nb}'"
+                            f"Error: Invalid key in metadata, "
+                            f"expected 'max_link_capacity' in line {line_nb}"
                         )
                     try:
                         max_val = int(metadata[0].split('=')[1])
@@ -368,8 +369,8 @@ class Parser:
                         capacity = max_val
                     except ValueError:
                         raise SystemExit(
-                            f"Error: max_link_capacity must be an integer greater than 0 in "
-                            f"line '{line_nb}'"
+                            f"Error: max_link_capacity must be an "
+                            f"integer greater than 0 in line {line_nb}"
                         )
             else:
                 capacity = 1
@@ -393,9 +394,14 @@ class Parser:
                 a `.txt`, if the file cannot be found/read, or if the
                 graph lacks start/end hubs.
         """
-        if len(argv) != 2:
+        if len(argv) > 2:
+            raise SystemExit("Error: Too many arguments.")
+        if len(argv) == 1:
+            file = input("Enter the file path: ")
+        else:
+            file = argv[1]
+        if not file:
             raise SystemExit("Error: No file provided.")
-        file = argv[1]
         if not file.endswith('txt'):
             raise SystemExit("Error: File must be a .txt file.")
         try:

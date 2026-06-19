@@ -4,10 +4,10 @@ install:
 	@python3 -m pip install -r requirements.txt
 
 run:
-	@python3 main.py maps/challenger/01_the_impossible_dream.txt || true
+	@python3 main.py || true
 
 debug:
-	@python3 -m pdb main.py maps/challenger/01_the_impossible_dream.txt || true
+	@python3 -m pdb main.py || true
 
 clean:
 	@find . -type d -name "__pycache__" -exec rm -r {} +
