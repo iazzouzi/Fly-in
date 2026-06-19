@@ -307,12 +307,18 @@ class Window(arcade.Window):
     def on_update(self, delta_time: float) -> None:
         """Updates the logical state and entity positions every frame.
 
-        Calculates the interpolation of drone movements between zones to
-        create a smooth visual flight path based on the engine's turn data.
+        Advances the simulation by interpolating drone positions between
+        their source and destination zones to produce smooth in-flight
+        animation. For restricted zones the drone animates to the midpoint
+        on the first turn and completes the journey on the second turn
+        (cost2/f flags). Also handles turn counter advancement once all
+        drones in the current turn have arrived, simulation restart (resetting
+        all drone positions to the start hub), and continuous sound loop
+        management.
 
         Args:
             delta_time (float): The time in seconds elapsed since the last
-                frame update.
+                frame update, used to scale movement speed frame-independently.
         """
         if self.player and not self.play:
             arcade.stop_sound(self.player)
@@ -451,6 +457,10 @@ class Window(arcade.Window):
             if hub.color == 'none':
                 hub.color = 'white'
             radius = 90
+            arcade.draw_circle_outline(
+                hub.x * 300, hub.y * 600, radius+30,
+                arcade.color.BLUE_SAPPHIRE, 10
+            )
             arcade.draw_circle_filled(
                 hub.x * 300, hub.y * 600, radius, arcade.color.WHITE_SMOKE
             )
@@ -568,11 +578,20 @@ class Window(arcade.Window):
             )
 
     def on_key_press(self, key: int, modifiers: int) -> None:
-        """Handles keyboard input to manipulate simulation playback.
+        """Handles keyboard input to control simulation playback and audio.
+
+        Key bindings:
+            SPACE: Toggle play/pause. Starts or stops drone animation and
+                syncs audio playback with the current sound toggle state.
+            R: Restart the simulation from the beginning, stopping any
+                active audio.
+            TAB: Toggle background sound on or off.
+            RIGHT: Advance one simulation turn manually while paused.
 
         Args:
             key (int): The arcade constant representing the key pressed.
-            modifiers (int): Bitwise mapping of modifier keys.
+            modifiers (int): Bitwise mapping of currently held modifier
+                keys (e.g., Shift, Ctrl).
         """
         if key == arcade.key.SPACE:
             if self.play:

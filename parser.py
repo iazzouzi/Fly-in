@@ -36,9 +36,12 @@ class Parser:
                 reporting.
             graph (Graph): The active graph structure being populated.
             hub_names (set[str]): An accumulated set of previously defined
-                hub names to prevent duplicates.
+                hub names to prevent duplicate name definitions.
+            hub_cords (set[tuple[int, int]]): An accumulated set of
+                previously used (x, y) coordinate pairs to prevent
+                duplicate zone positions.
             flags (dict[str, bool]): State dictionary tracking parsing
-                progression (e.g., 'start_f').
+                progression (e.g., 'start_f', 'end_f', 'nb_drones_f').
 
         Raises:
             SystemExit: If the line contains invalid syntax, duplicate
@@ -144,15 +147,37 @@ class Parser:
             if not metadata:
                 return
             metadata_keys = {'color', 'max_drones', 'zone'}
-            if not metadata[0].startswith('[') or not metadata[
-                -1
-            ].endswith(']'):
+            tmp = []
+            for word in metadata:
+                for ch in word:
+                    if ch == '[' or ch == ']':
+                        tmp.append(ch)
+            if tmp[0] != '[' or tmp[1] != ']' or len(tmp) != 2:
                 raise SystemExit(
-                    f"Error: Metadata must be enclosed in [] in line "
+                    f"Error: Metadata must be enclosed in [] and must "
+                    f"contain exactly one opening and one closing bracket in line "
                     f"'{line_nb}'"
                 )
-            metadata[0] = metadata[0].lstrip('[')
-            metadata[-1] = metadata[-1].rstrip(']')
+            if not metadata[0].startswith('['):
+                    raise SystemExit(
+                        f"Error: Metadata must be enclosed in [] in line "
+                        f"'{line_nb}'"
+                    )
+            if not metadata[-1].endswith(']'):
+                    raise SystemExit(
+                        f"Error: Metadata must be enclosed in [] in line "
+                        f"'{line_nb}'"
+                    )
+            if metadata[0] == '[':
+                metadata.pop(0)
+            elif metadata[0].startswith('['):
+                metadata[0] = metadata[0].lstrip('[')
+            if metadata[-1] == ']':
+                metadata.pop(-1)
+            elif metadata[-1].endswith(']'):
+                metadata[-1] = metadata[-1].rstrip(']')
+            if not metadata:
+                return
             color_f = False
             max_drones_f = False
             zone_f = False
@@ -201,28 +226,23 @@ class Parser:
                             f"Error: max_drones metadata cannot be repeated "
                             f"in line '{line_nb}'"
                         )
-                    try:
-                        if int(ivalue) <= 0:
+                    if key in {'start_hub', 'end_hub'}:
+                        graph.hubs[name].max_drones = graph.nb_drones
+                        max_drones_f = True
+                    else:
+                        try:
+                            if int(ivalue) <= 0:
+                                raise SystemExit(
+                                    f"Error: max_drones must be a positive "
+                                    f"integer greater than 0 in line '{line_nb}'"
+                                )
+                            graph.hubs[name].max_drones = int(ivalue)
+                            max_drones_f = True
+                        except ValueError:
                             raise SystemExit(
-                                f"Error: max_drones must be a positive "
-                                f"integer in line '{line_nb}'"
-                            )
-                        graph.hubs[name].max_drones = int(ivalue)
-                        if (
-                            key in {'start_hub', 'end_hub'}
-                            and int(ivalue) != graph.nb_drones
-                        ):
-                            raise SystemExit(
-                                f"Error: max_drones for start_hub and "
-                                f"end_hub must be equal nb_drones in line "
+                                f"Error: max_drones must be an integer in line "
                                 f"'{line_nb}'"
                             )
-                        max_drones_f = True
-                    except ValueError:
-                        raise SystemExit(
-                            f"Error: max_drones must be an integer in line "
-                            f"'{line_nb}'"
-                        )
                 if ikey == 'zone':
                     if zone_f:
                         raise SystemExit(
@@ -246,15 +266,7 @@ class Parser:
                         graph.hubs[name].cost = 0.2
                     zone_f = True
         if key == 'connection':
-            if value.count(' ') > 1:
-                raise SystemExit(
-                    f"Error: Invalid connection format in line '{line_nb}'"
-                )
-            if len(value.split()) == 1:
-                connection = value
-                max_link_capacity = None
-            else:
-                connection, max_link_capacity = value.split()
+            connection, *metadata = value.split()
             if connection.count('-') != 1:
                 raise SystemExit(
                     f"Error: Invalid connection format there must be "
@@ -300,41 +312,65 @@ class Parser:
                     "Error: Connection hubs must be defined in the "
                     f"hubs section in line '{line_nb}'"
                 )
-            if max_link_capacity:
-                if max_link_capacity.count('=') != 1:
+            if metadata:
+                tmp = []
+                for word in metadata:
+                    for ch in word:
+                        if ch == '[' or ch == ']':
+                            tmp.append(ch)
+                if tmp[0] != '[' or tmp[1] != ']' or len(tmp) != 2:
                     raise SystemExit(
-                        f"Error: Invalid max_link_capacity format in "
-                        f"line '{line_nb}'"
+                        f"Error: Metadata must be enclosed in [] and must "
+                        f"contain exactly one opening and one closing bracket in line "
+                        f"'{line_nb}'"
                     )
-                if (
-                    not max_link_capacity.startswith('[')
-                    or not max_link_capacity.endswith(']')
-                ):
-                    raise SystemExit(
-                        f"Error: max_link_capacity must be enclosed in "
-                        f"[] in line '{line_nb}'"
-                    )
-                max_link_capacity = (
-                    max_link_capacity.lstrip('[').rstrip(']')
-                )
-                if max_link_capacity.split('=')[0] != 'max_link_capacity':
-                    raise SystemExit(
-                        f"Error: Invalid max_link_capacity format in "
-                        f"line '{line_nb}'"
-                    )
-                try:
-                    max_val = int(max_link_capacity.split('=')[1])
-                    if max_val <= 0:
+                if not metadata[0].startswith('['):
                         raise SystemExit(
-                            f"Error: max_link_capacity must be a positive "
-                            f"integer in line '{line_nb}'"
+                            f"Error: Metadata must be enclosed in [] in line "
+                            f"'{line_nb}'"
                         )
-                    capacity = max_val
-                except ValueError:
-                    raise SystemExit(
-                        f"Error: max_link_capacity must be an integer in "
-                        f"line '{line_nb}'"
-                    )
+                if not metadata[-1].endswith(']'):
+                        raise SystemExit(
+                            f"Error: Metadata must be enclosed in [] in line "
+                            f"'{line_nb}'"
+                        )
+                if metadata[0] == '[':
+                    metadata.pop(0)
+                elif metadata[0].startswith('['):
+                    metadata[0] = metadata[0].lstrip('[')
+                if metadata[-1] == ']':
+                    metadata.pop(-1)
+                elif metadata[-1].endswith(']'):
+                    metadata[-1] = metadata[-1].rstrip(']')
+                if metadata:
+                    if len(metadata) != 1:
+                        raise SystemExit(
+                            f"Error: Invalid metadata format must contain "
+                            f"exactly one metadata item in line '{line_nb}'"
+                        )
+                    if metadata[0].count('=') != 1:
+                        raise SystemExit(
+                            f"Error: Invalid metadata format must contain exactly one '=' in "
+                            f"line '{line_nb}'"
+                        )
+                    if metadata[0].split('=')[0] != 'max_link_capacity':
+                        raise SystemExit(
+                            f"Error: Invalid key in metadata, expected 'max_link_capacity' in "
+                            f"line '{line_nb}'"
+                        )
+                    try:
+                        max_val = int(metadata[0].split('=')[1])
+                        if max_val <= 0:
+                            raise SystemExit(
+                                f"Error: max_link_capacity must be a positive "
+                                f"integer in line '{line_nb}'"
+                            )
+                        capacity = max_val
+                    except ValueError:
+                        raise SystemExit(
+                            f"Error: max_link_capacity must be an integer greater than 0 in "
+                            f"line '{line_nb}'"
+                        )
             else:
                 capacity = 1
             graph.connections.append(Connection(from_shub, to_shub, capacity))

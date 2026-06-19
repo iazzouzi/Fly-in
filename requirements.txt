@@ -1,0 +1,2 @@
+arcade==3.3.3
+webcolors==25.10.0

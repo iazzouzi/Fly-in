@@ -25,8 +25,12 @@ class Engine:
         Args:
             graph (Graph): The network graph containing zones and connections.
             drone (Drone): The drone requiring a path calculation.
-            base (dict[str, int | float | list[list[str]]]): Dictionary
-                tracking base path cost, search flags, and path cache.
+            base (dict[str, int | float | list[list[str]]]): Shared state
+                dictionary with three keys: 'f' (int flag, 1 on first call
+                then set to 0 after the baseline cost is recorded), 'base'
+                (float storing the reference path cost all drones must match),
+                and 'cache' (list of previously computed [from, next] name
+                pairs for fast lookup without re-running Dijkstra).
 
         Returns:
             Zone | None: The next zone the drone should move to, or None if
@@ -112,7 +116,10 @@ class Engine:
 
         Executes turn-by-turn simulation, scheduling drone movements while
         respecting capacity constraints, restricted zones, and connection
-        limits.
+        limits. Uses two sets to coordinate movement within each turn:
+        `stmp` tracks drones already moved this turn (preventing double
+        moves), and `tmp` tracks drones mid-transit through restricted zones
+        that must complete their journey on the next turn.
 
         Args:
             graph (Graph): The fully parsed network graph.
@@ -148,6 +155,7 @@ class Engine:
         for drone in drones:
             drone.x = graph.start_hub.x
             drone.y = graph.start_hub.y
+            drone.path.append(graph.start_hub)
             graph.drones.append(drone)
             graph.start_hub.occupancy.append(drone)
 
@@ -217,7 +225,7 @@ class Engine:
                         if drone in stmp:
                             continue
                         if nxt.zone == 'restricted':
-                            line += f"D{drone.id}-{pos.name}-{nxt.name} "
+                            line += f"D{drone.id}-{pos}-{nxt} "
                             turns[-1][-1]['cost2'] = 1
                             nxt.reserved = 1
                             tmp.add(drone)

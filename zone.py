@@ -20,8 +20,9 @@ class Zone:
         is_end (bool): True if this is the destination zone.
         cost (float): Movement cost to reach this zone (1.0 for normal,
             2.0 for restricted, 0.2 for priority).
-        reserved (int): Number of incoming drones reserved for capacity
-            management.
+        reserved (int): Boolean flag (0 or 1) indicating the zone is at
+            full capacity or locked for an incoming restricted-zone
+            transit, blocking further entries.
         occupancy (list[Drone]): List of drones currently residing in the
             zone.
     """

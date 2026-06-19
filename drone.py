@@ -8,8 +8,10 @@ class Drone:
         id (int): Unique numeric identifier for the drone.
         x (float): Current X coordinate position in the visualization.
         y (float): Current Y coordinate position in the visualization.
-        path (list[Zone]): Chronological list of zones the drone has
-            visited or will visit.
+        path (list[Zone]): Chronological history of zones the drone has
+            visited, appended to incrementally as the drone moves.
+            Starts empty and is used by the engine to calculate
+            cumulative path cost.
         position (Zone): The current zone the drone is occupying.
         delivered (int): Status flag indicating if the drone has reached
             the end hub.
