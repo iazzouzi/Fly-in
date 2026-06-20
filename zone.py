@@ -1,7 +1,3 @@
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from drone import Drone
 
 
 class Zone:
@@ -51,6 +47,7 @@ class Zone:
         self.is_end: bool = False
         self.cost: float = 1.0
         self.reserved: int = 0
+        from drone import Drone
         self.occupancy: list['Drone'] = []
 
     def __repr__(self) -> str:

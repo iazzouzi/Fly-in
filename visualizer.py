@@ -3,7 +3,7 @@ from drone import Drone
 from zone import Zone
 from math import sqrt
 import arcade
-import webcolors  # type: ignore[import-untyped]
+import webcolors  # # type: ignore[import-untyped]
 from pyglet.media.player import Player
 
 
@@ -645,7 +645,8 @@ class Window(arcade.Window):
 
 
 class Visualizer:
-    """Thin wrapper that constructs the Window and starts the arcade event loop.
+    """Thin wrapper that constructs the Window and starts the arcade
+    event loop.
 
     Keeping this class separate from Window allows the simulation pipeline
     (parse → simulate → visualise) to remain decoupled: the engine never
@@ -667,7 +668,8 @@ class Visualizer:
             width: Desired window width in pixels.
             height: Desired window height in pixels.
             graph: The parsed routing network.
-            turns: The movement timeline returned by :meth:`~engine.Engine.simulator`.
+            turns: The movement timeline returned by :meth:`~engine.
+            Engine.simulator`.
         """
         Window(width, height, graph, turns)
         arcade.run()

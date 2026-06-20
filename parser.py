@@ -2,7 +2,7 @@ from sys import argv
 from zone import Zone
 from graph import Graph
 from connection import Connection
-import webcolors  # type: ignore[import-untyped]
+import webcolors  # # type: ignore[import-untyped]
 
 
 class Parser:
@@ -251,7 +251,8 @@ class Parser:
                             f"Error on line {line_nb}: 'zone' metadata key "
                             f"cannot appear more than once."
                         )
-                    valid_types = {'normal', 'blocked', 'restricted', 'priority'}
+                    valid_types = {
+                        'normal', 'blocked', 'restricted', 'priority'}
                     if ivalue not in valid_types:
                         raise SystemExit(
                             f"Error on line {line_nb}: invalid zone type "
